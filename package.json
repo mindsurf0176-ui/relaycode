@@ -41,7 +41,7 @@
   "devDependencies": {
     "concurrently": "^9.2.1",
     "esbuild": "^0.28.1",
-    "typescript": "^5.9.3",
+    "typescript": "^7.0.2",
     "vitest": "^3.2.4"
   },
   "engines": {
