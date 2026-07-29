@@ -1,0 +1,33 @@
+name: Bug report
+description: Report a reproducible RelayCode problem
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: Do not include pairing URLs, tokens, credentials, or private repository content.
+  - type: input
+    id: version
+    attributes:
+      label: RelayCode version
+      placeholder: relaycode --version
+    validations:
+      required: true
+  - type: input
+    id: codex
+    attributes:
+      label: Codex version
+      placeholder: codex --version
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true

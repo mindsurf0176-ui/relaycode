@@ -1,0 +1,50 @@
+{
+  "name": "relaycode",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mobile-first remote development control plane for local coding agents.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mindsurf0176-ui/relaycode.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mindsurf0176-ui/relaycode/issues"
+  },
+  "homepage": "https://github.com/mindsurf0176-ui/relaycode#readme",
+  "bin": {
+    "relaycode": "dist/relaycode"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @relaycode/protocol && npm run build -w @relaycode/mobile && npm run build -w @relaycode/bridge",
+    "build:cli": "node scripts/build-cli.mjs",
+    "dev": "concurrently -n bridge,mobile -c cyan,magenta \"npm run dev -w @relaycode/bridge\" \"npm run dev -w @relaycode/mobile\"",
+    "prestart": "npm run build",
+    "start": "npm run start -w @relaycode/bridge",
+    "pair": "npm run pair -w @relaycode/bridge",
+    "relaycode": "node apps/bridge/dist/index.js",
+    "release:package": "bash scripts/package-release.sh",
+    "smoke:mobile": "node scripts/mobile-smoke.mjs",
+    "ios:generate": "cd apps/ios && xcodegen generate",
+    "ios:typecheck": "bash apps/ios/scripts/typecheck.sh",
+    "ios:test": "cd apps/ios && swift test",
+    "ios:verify": "bash apps/ios/scripts/verify.sh",
+    "ios:build": "npm run ios:generate && xcodebuild -project apps/ios/RelayCode.xcodeproj -scheme RelayCode -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build",
+    "pretest": "npm run build -w @relaycode/protocol",
+    "test": "vitest run",
+    "typecheck": "npm run typecheck -w @relaycode/protocol && npm run typecheck -w @relaycode/bridge && npm run typecheck -w @relaycode/mobile"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "esbuild": "^0.28.1",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
