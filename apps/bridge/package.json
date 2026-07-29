@@ -1,6 +1,6 @@
 {
   "name": "@relaycode/bridge",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,7 +13,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@relaycode/protocol": "0.1.0",
+    "@relaycode/protocol": "0.1.1",
     "dotenv": "^17.4.2",
     "qrcode-terminal": "^0.12.0",
     "ws": "^8.18.3"

@@ -13,7 +13,7 @@ import {
 import { printPairing } from "./pair.js";
 import { RelayServer } from "./server.js";
 
-export const relayCodeVersion = "0.1.0";
+export const relayCodeVersion = "0.1.1";
 
 export type CliOptions = {
   command: "help" | "version" | "setup" | "serve" | "pair" | "status" | "doctor";
@@ -128,20 +128,69 @@ export function tailscalePublicUrl(raw: string): string | null {
   return `https://${host}`;
 }
 
+type TailscaleServeStatus = {
+  TCP?: Record<string, unknown>;
+  Web?: Record<string, {
+    Handlers?: Record<string, {
+      Proxy?: unknown;
+    }>;
+  }>;
+};
+
+function portFromServeHost(host: string): number | null {
+  const match = host.match(/:(\d+)$/);
+  if (!match) return 443;
+  const port = Number(match[1]);
+  return Number.isInteger(port) ? port : null;
+}
+
+export function chooseTailscaleHttpsPort(raw: string, relayPort: number): number {
+  let status: TailscaleServeStatus = {};
+  try {
+    status = JSON.parse(raw) as TailscaleServeStatus;
+  } catch {
+    // Treat unreadable status as empty and let the serve command validate it.
+  }
+  const targets = new Set([
+    `http://127.0.0.1:${relayPort}`,
+    `http://localhost:${relayPort}`,
+  ]);
+  const used = new Set<number>();
+  for (const key of Object.keys(status.TCP || {})) {
+    const port = Number(key);
+    if (Number.isInteger(port)) used.add(port);
+  }
+  for (const [host, site] of Object.entries(status.Web || {})) {
+    const port = portFromServeHost(host);
+    if (port !== null) used.add(port);
+    const proxy = site.Handlers?.["/"]?.Proxy;
+    if (port !== null && typeof proxy === "string" && targets.has(proxy.replace(/\/+$/, ""))) {
+      return port;
+    }
+  }
+  if (!used.has(443)) return 443;
+  for (let port = 8443; port <= 8453; port += 1) {
+    if (!used.has(port)) return port;
+  }
+  throw new Error("No free Tailscale HTTPS port was found between 8443 and 8453.");
+}
+
 function configureTailscale(port: number): string | null {
   const raw = capture(process.env.TAILSCALE_BIN || "tailscale", ["status", "--json"]);
   if (!raw) return null;
-  const publicUrl = tailscalePublicUrl(raw);
-  if (!publicUrl) return null;
+  const baseUrl = tailscalePublicUrl(raw);
+  if (!baseUrl) return null;
+  const serveStatus = capture(process.env.TAILSCALE_BIN || "tailscale", ["serve", "status", "--json"]) || "{}";
+  const httpsPort = chooseTailscaleHttpsPort(serveStatus, port);
   const result = spawnSync(
     process.env.TAILSCALE_BIN || "tailscale",
-    ["serve", "--bg", "--https=443", `http://127.0.0.1:${port}`],
+    ["serve", "--bg", `--https=${httpsPort}`, `http://127.0.0.1:${port}`],
     { stdio: "inherit" },
   );
   if (result.status !== 0) {
     throw new Error("Tailscale Serve could not be configured.");
   }
-  return publicUrl;
+  return httpsPort === 443 ? baseUrl : `${baseUrl}:${httpsPort}`;
 }
 
 function restartHomebrewService(): boolean {

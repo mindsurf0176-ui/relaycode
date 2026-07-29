@@ -19,7 +19,7 @@ import { canonicalRoots, currentTokenHash, type RelayConfig } from "./config.js"
 import { CodexAppServer } from "./codex-app-server.js";
 import { assertWorkspacePath, sanitizeAgentParams, tokenFromProtocols, tokenMatches } from "./security.js";
 
-const bridgeVersion = "0.1.0";
+const bridgeVersion = "0.1.1";
 const allowedMethods = new Set<string>(allowedAgentMethods);
 const allowedServerRequests = new Set<string>(mobileServerRequestMethods);
 const threadScopedMethods = new Set<string>([
