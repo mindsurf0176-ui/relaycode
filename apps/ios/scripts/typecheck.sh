@@ -4,8 +4,10 @@ set -euo pipefail
 IOS_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 IOS_SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
 MODULE_DIR="$(mktemp -d /tmp/relaycode-ios-typecheck.XXXXXX)"
+LLAMA_FRAMEWORKS="$IOS_DIR/RelayCodeLlamaRuntime/vendor/llama.xcframework/ios-arm64"
 
 "$IOS_DIR/scripts/prepare-linux-runtime.sh"
+"$IOS_DIR/scripts/prepare-llama-runtime.sh"
 
 xcrun --sdk iphoneos clang \
   -target arm64-apple-ios17.0 \
@@ -31,6 +33,7 @@ xcrun --sdk iphoneos swiftc \
   -target arm64-apple-ios17.0 \
   -sdk "$IOS_SDK" \
   -I "$MODULE_DIR" \
+  -F "$LLAMA_FRAMEWORKS" \
   -import-objc-header "$IOS_DIR/RelayCode/RelayCode-Bridging-Header.h" \
   -Xcc -I"$IOS_DIR/RelayCodeLinuxRuntime/include" \
   "$IOS_DIR"/RelayCode/*.swift

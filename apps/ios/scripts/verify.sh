@@ -6,6 +6,7 @@ REPO_DIR="$(cd "$IOS_DIR/../.." && pwd)"
 IOS_SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
 LINK_DIR="$(mktemp -d /tmp/relaycode-ios-link.XXXXXX)"
 ASSET_DIR="$(mktemp -d /tmp/relaycode-ios-assets.XXXXXX)"
+LLAMA_FRAMEWORKS="$IOS_DIR/RelayCodeLlamaRuntime/vendor/llama.xcframework/ios-arm64"
 
 cd "$REPO_DIR"
 npm run ios:typecheck
@@ -39,11 +40,13 @@ xcrun --sdk iphoneos swiftc \
   -target arm64-apple-ios17.0 \
   -sdk "$IOS_SDK" \
   -I "$LINK_DIR" \
+  -F "$LLAMA_FRAMEWORKS" \
   -import-objc-header "$IOS_DIR/RelayCode/RelayCode-Bridging-Header.h" \
   -Xcc -I"$IOS_DIR/RelayCodeLinuxRuntime/include" \
   "$IOS_DIR"/RelayCode/*.swift \
   "$LINK_DIR/RelayCodeCore.o" \
   "$LINK_DIR/RelayCodeLinuxRuntime.o" \
+  -framework llama \
   -o "$LINK_DIR/RelayCode"
 
 ACTOOL_REPORT="$ASSET_DIR/actool-report.plist"

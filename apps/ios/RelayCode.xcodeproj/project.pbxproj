@@ -8,15 +8,20 @@
 
 /* Begin PBXBuildFile section */
 		01C71751B41F0F319F4282BE /* RelayCodeCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = EA00588CDFBADD99E0A27048 /* RelayCodeCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		053A2B01AB14F80C4C398003 /* llama-cpp-license.txt in Resources */ = {isa = PBXBuildFile; fileRef = 5AFAA999359C2B620E990ED5 /* llama-cpp-license.txt */; };
 		11D654B4973FB14933DA19BF /* RelayCodeCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = EA00588CDFBADD99E0A27048 /* RelayCodeCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		18CEA6657D14DF006A0B7357 /* PairingConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16DE46CAE64E4B7C1B66BD7B /* PairingConfiguration.swift */; };
+		19504721ECE54576C56FB776 /* OnDeviceModelService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A10C8782F0025D33C0AE6CD /* OnDeviceModelService.swift */; };
 		1CFCC552282429992F3566BD /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = DCE3F0B317F8859BCEED12EB /* PrivacyInfo.xcprivacy */; };
+		24FEF24130DE0B569846C763 /* OnDeviceInferenceEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = F920B36702F91BB78722CB95 /* OnDeviceInferenceEngine.swift */; };
 		331EA6D761AD6F0A6061F8E9 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AF84183E266329C40DB4F82 /* RootView.swift */; };
 		57D06B36937378F28D73CA7D /* THIRD_PARTY_NOTICES.md in Resources */ = {isa = PBXBuildFile; fileRef = 361E2F11FC911183D99661AC /* THIRD_PARTY_NOTICES.md */; };
+		5FCF7394FD742B69CD9DC74C /* OnDeviceModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 271FD1F28FFA7012205F4656 /* OnDeviceModel.swift */; };
 		6B8D260918573123E6FFAC71 /* InferenceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F0393C9D2CD5410B31A318C /* InferenceView.swift */; };
 		714B21F348FBB52AFEB1B913 /* KeychainPairingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B164BEE8CCC0189EF1314CDD /* KeychainPairingStore.swift */; };
 		7DFC830B616A795C2E5842F6 /* LinuxRuntimeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC977EE11C723DF288F694C0 /* LinuxRuntimeView.swift */; };
 		81F19276F4ADE33AC6686A36 /* KeychainModelConnectionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 695FF9AA36A9FEB936B2B1D0 /* KeychainModelConnectionStore.swift */; };
+		8FCE61FDDD031B2987F85920 /* OnDeviceModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C9A3A31835298D12A244360 /* OnDeviceModelTests.swift */; };
 		9021AFB6D7629DCBF7F8B76E /* RelayCodeLinuxRuntime.c in Sources */ = {isa = PBXBuildFile; fileRef = 7AD2317DE62F8E0183C52BB7 /* RelayCodeLinuxRuntime.c */; };
 		9BEBAEB421F6134395A069AC /* OpenAICompatibleModelClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03D963EEDFB8D43042471312 /* OpenAICompatibleModelClientTests.swift */; };
 		9D4BEE02042539552F9F230D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 896097C58C4C463C75C8E2E8 /* Assets.xcassets */; };
@@ -24,10 +29,13 @@
 		9D9BB76F834A83CF6D744C03 /* RelayCodeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1256C5C2184BAE2FC698EC48 /* RelayCodeApp.swift */; };
 		9DA4D8EE5189E49008DE16A9 /* RelayCodeCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EA00588CDFBADD99E0A27048 /* RelayCodeCore.framework */; };
 		A982A2EF3196A31E8F00CF9F /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2346C6D19BD110D5A25BA337 /* AppModel.swift */; };
+		B2887BD463500C06FCF91907 /* llama.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 14A51177B734030902819DEF /* llama.xcframework */; };
 		BB8E1ED462E1F6FDB43AC298 /* PairingConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 832BFFED13449A10B849B091 /* PairingConfigurationTests.swift */; };
 		BE02CE912F6060A1FA8E55D5 /* ModelConnectionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B84A47BBB20587F759F375C4 /* ModelConnectionsView.swift */; };
+		BFE627E0626085A5DD1435A4 /* qwen-model-license.txt in Resources */ = {isa = PBXBuildFile; fileRef = 7906F0CB38FFF543703DD6F0 /* qwen-model-license.txt */; };
 		DA78F7EF2289E929AB0E5F40 /* RuntimeProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CE79CA957C66DD2E56E0052 /* RuntimeProfileTests.swift */; };
 		DB4AB038B491B3EBAF15A38D /* OpenAICompatibleModelClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EA534F8C94838D37CA8D68B /* OpenAICompatibleModelClient.swift */; };
+		EA0BD987A690FC9363C4C6DE /* llama.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 14A51177B734030902819DEF /* llama.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		ECEAF93373B58DA3DEFECC0A /* WebContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBFD2B92A73510B020D1ADF2 /* WebContainerView.swift */; };
 		F1BC9CA632C3788AC8E16B9D /* linux-rv32.img in Resources */ = {isa = PBXBuildFile; fileRef = FB973E4404F62647F5F896C0 /* linux-rv32.img */; };
 		F2FE022E5665EDAC614E100F /* LinuxRuntimeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1481B815900D2405BE5869C /* LinuxRuntimeController.swift */; };
@@ -71,6 +79,7 @@
 			dstSubfolderSpec = 10;
 			files = (
 				11D654B4973FB14933DA19BF /* RelayCodeCore.framework in Embed Frameworks */,
+				EA0BD987A690FC9363C4C6DE /* llama.xcframework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -81,15 +90,21 @@
 		03D963EEDFB8D43042471312 /* OpenAICompatibleModelClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAICompatibleModelClientTests.swift; sourceTree = "<group>"; };
 		1256C5C2184BAE2FC698EC48 /* RelayCodeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayCodeApp.swift; sourceTree = "<group>"; };
 		14013E0C2E80CC007131536E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		14A51177B734030902819DEF /* llama.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = llama.xcframework; path = RelayCodeLlamaRuntime/vendor/llama.xcframework; sourceTree = "<group>"; };
 		16DE46CAE64E4B7C1B66BD7B /* PairingConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingConfiguration.swift; sourceTree = "<group>"; };
+		1A10C8782F0025D33C0AE6CD /* OnDeviceModelService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnDeviceModelService.swift; sourceTree = "<group>"; };
 		2346C6D19BD110D5A25BA337 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		271FD1F28FFA7012205F4656 /* OnDeviceModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnDeviceModel.swift; sourceTree = "<group>"; };
 		361E2F11FC911183D99661AC /* THIRD_PARTY_NOTICES.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = THIRD_PARTY_NOTICES.md; sourceTree = "<group>"; };
 		3B6EC74F09C5BAD1DB604051 /* RelayCode-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "RelayCode-Bridging-Header.h"; sourceTree = "<group>"; };
 		3F0393C9D2CD5410B31A318C /* InferenceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InferenceView.swift; sourceTree = "<group>"; };
 		51085A20EF24AC6C27832ED0 /* RelayCodeTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = RelayCodeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5AFAA999359C2B620E990ED5 /* llama-cpp-license.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "llama-cpp-license.txt"; sourceTree = "<group>"; };
 		5CE79CA957C66DD2E56E0052 /* RuntimeProfileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProfileTests.swift; sourceTree = "<group>"; };
 		695FF9AA36A9FEB936B2B1D0 /* KeychainModelConnectionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainModelConnectionStore.swift; sourceTree = "<group>"; };
 		6AF84183E266329C40DB4F82 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		6C9A3A31835298D12A244360 /* OnDeviceModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnDeviceModelTests.swift; sourceTree = "<group>"; };
+		7906F0CB38FFF543703DD6F0 /* qwen-model-license.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "qwen-model-license.txt"; sourceTree = "<group>"; };
 		7AD2317DE62F8E0183C52BB7 /* RelayCodeLinuxRuntime.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = RelayCodeLinuxRuntime.c; sourceTree = "<group>"; };
 		832BFFED13449A10B849B091 /* PairingConfigurationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingConfigurationTests.swift; sourceTree = "<group>"; };
 		896097C58C4C463C75C8E2E8 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -106,6 +121,7 @@
 		DCE3F0B317F8859BCEED12EB /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		E6EF60A179D348D3608322E7 /* default64mbdtc.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = default64mbdtc.h; sourceTree = "<group>"; };
 		EA00588CDFBADD99E0A27048 /* RelayCodeCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = RelayCodeCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		F920B36702F91BB78722CB95 /* OnDeviceInferenceEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnDeviceInferenceEngine.swift; sourceTree = "<group>"; };
 		FB973E4404F62647F5F896C0 /* linux-rv32.img */ = {isa = PBXFileReference; path = "linux-rv32.img"; sourceTree = "<group>"; };
 		FF34D962ABAC79634E65428C /* RuntimeProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProfile.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -124,6 +140,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				9D51BA8492BF6950C90169F1 /* RelayCodeCore.framework in Frameworks */,
+				B2887BD463500C06FCF91907 /* llama.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -140,6 +157,15 @@
 			path = RelayCodeLinuxRuntime;
 			sourceTree = "<group>";
 		};
+		21E2887440ED3D393EE69641 /* OnDeviceModel */ = {
+			isa = PBXGroup;
+			children = (
+				5AFAA999359C2B620E990ED5 /* llama-cpp-license.txt */,
+				7906F0CB38FFF543703DD6F0 /* qwen-model-license.txt */,
+			);
+			path = OnDeviceModel;
+			sourceTree = "<group>";
+		};
 		61B3EC0CBD54F9D332555F45 /* Linux */ = {
 			isa = PBXGroup;
 			children = (
@@ -149,11 +175,20 @@
 			path = Linux;
 			sourceTree = "<group>";
 		};
+		8B61EBDBDB12EAFFAE995B80 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				14A51177B734030902819DEF /* llama.xcframework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		A43E912D2287A44EE890C836 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
 				361E2F11FC911183D99661AC /* THIRD_PARTY_NOTICES.md */,
 				61B3EC0CBD54F9D332555F45 /* Linux */,
+				21E2887440ED3D393EE69641 /* OnDeviceModel */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -178,6 +213,7 @@
 		D56B5AB1DB740EB7B340C6B6 /* RelayCodeTests */ = {
 			isa = PBXGroup;
 			children = (
+				6C9A3A31835298D12A244360 /* OnDeviceModelTests.swift */,
 				03D963EEDFB8D43042471312 /* OpenAICompatibleModelClientTests.swift */,
 				832BFFED13449A10B849B091 /* PairingConfigurationTests.swift */,
 				5CE79CA957C66DD2E56E0052 /* RuntimeProfileTests.swift */,
@@ -192,6 +228,7 @@
 				FB764D94D8D00E6C902DE6DD /* RelayCodeCore */,
 				07F392538E4D33AB9E261B3E /* RelayCodeLinuxRuntime */,
 				D56B5AB1DB740EB7B340C6B6 /* RelayCodeTests */,
+				8B61EBDBDB12EAFFAE995B80 /* Frameworks */,
 				FBBD04ABA2869365E29A5DA4 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -208,6 +245,8 @@
 				B1481B815900D2405BE5869C /* LinuxRuntimeController.swift */,
 				DC977EE11C723DF288F694C0 /* LinuxRuntimeView.swift */,
 				B84A47BBB20587F759F375C4 /* ModelConnectionsView.swift */,
+				F920B36702F91BB78722CB95 /* OnDeviceInferenceEngine.swift */,
+				1A10C8782F0025D33C0AE6CD /* OnDeviceModelService.swift */,
 				DCE3F0B317F8859BCEED12EB /* PrivacyInfo.xcprivacy */,
 				3B6EC74F09C5BAD1DB604051 /* RelayCode-Bridging-Header.h */,
 				1256C5C2184BAE2FC698EC48 /* RelayCodeApp.swift */,
@@ -221,6 +260,7 @@
 		FB764D94D8D00E6C902DE6DD /* RelayCodeCore */ = {
 			isa = PBXGroup;
 			children = (
+				271FD1F28FFA7012205F4656 /* OnDeviceModel.swift */,
 				9EA534F8C94838D37CA8D68B /* OpenAICompatibleModelClient.swift */,
 				16DE46CAE64E4B7C1B66BD7B /* PairingConfiguration.swift */,
 				FF34D962ABAC79634E65428C /* RuntimeProfile.swift */,
@@ -350,6 +390,8 @@
 				57D06B36937378F28D73CA7D /* THIRD_PARTY_NOTICES.md in Resources */,
 				F339406C989C0E887F17241B /* linux-guest-license.txt in Resources */,
 				F1BC9CA632C3788AC8E16B9D /* linux-rv32.img in Resources */,
+				053A2B01AB14F80C4C398003 /* llama-cpp-license.txt in Resources */,
+				BFE627E0626085A5DD1435A4 /* qwen-model-license.txt in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -360,6 +402,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5FCF7394FD742B69CD9DC74C /* OnDeviceModel.swift in Sources */,
 				DB4AB038B491B3EBAF15A38D /* OpenAICompatibleModelClient.swift in Sources */,
 				18CEA6657D14DF006A0B7357 /* PairingConfiguration.swift in Sources */,
 				F741BF6850B94FF92D806689 /* RuntimeProfile.swift in Sources */,
@@ -377,6 +420,8 @@
 				F2FE022E5665EDAC614E100F /* LinuxRuntimeController.swift in Sources */,
 				7DFC830B616A795C2E5842F6 /* LinuxRuntimeView.swift in Sources */,
 				BE02CE912F6060A1FA8E55D5 /* ModelConnectionsView.swift in Sources */,
+				24FEF24130DE0B569846C763 /* OnDeviceInferenceEngine.swift in Sources */,
+				19504721ECE54576C56FB776 /* OnDeviceModelService.swift in Sources */,
 				9D9BB76F834A83CF6D744C03 /* RelayCodeApp.swift in Sources */,
 				9021AFB6D7629DCBF7F8B76E /* RelayCodeLinuxRuntime.c in Sources */,
 				331EA6D761AD6F0A6061F8E9 /* RootView.swift in Sources */,
@@ -388,6 +433,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8FCE61FDDD031B2987F85920 /* OnDeviceModelTests.swift in Sources */,
 				9BEBAEB421F6134395A069AC /* OpenAICompatibleModelClientTests.swift in Sources */,
 				BB8E1ED462E1F6FDB43AC298 /* PairingConfigurationTests.swift in Sources */,
 				DA78F7EF2289E929AB0E5F40 /* RuntimeProfileTests.swift in Sources */,
@@ -506,6 +552,10 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"RelayCodeLlamaRuntime/vendor\"",
+				);
 				HEADER_SEARCH_PATHS = (
 					"$(SRCROOT)/RelayCodeLinuxRuntime/include",
 					"$(SRCROOT)/RelayCodeLinuxRuntime/vendor",
@@ -530,6 +580,10 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"RelayCodeLlamaRuntime/vendor\"",
+				);
 				HEADER_SEARCH_PATHS = (
 					"$(SRCROOT)/RelayCodeLinuxRuntime/include",
 					"$(SRCROOT)/RelayCodeLinuxRuntime/vendor",

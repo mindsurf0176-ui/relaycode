@@ -34,6 +34,8 @@ targets:
       - path: RelayCodeLinuxRuntime
     dependencies:
       - target: RelayCodeCore
+      - framework: RelayCodeLlamaRuntime/vendor/llama.xcframework
+        embed: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.minseo.relaycode

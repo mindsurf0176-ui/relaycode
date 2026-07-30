@@ -13,6 +13,9 @@ DerivedData/
 **/xcuserdata/
 *.xcuserstate
 apps/ios/RelayCodeLinuxRuntime/vendor/
+apps/ios/RelayCodeLlamaRuntime/vendor/
 apps/ios/RelayCode/Resources/Linux/linux-rv32.img
 apps/ios/RelayCode/Resources/Linux/linux-guest-license.txt
+apps/ios/RelayCode/Resources/OnDeviceModel/llama-cpp-license.txt
+apps/ios/RelayCode/Resources/OnDeviceModel/qwen-model-license.txt
 apps/ios/RelayCode [0-9]*.xcodeproj/

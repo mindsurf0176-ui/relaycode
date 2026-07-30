@@ -8,20 +8,20 @@ struct ModelConnectionsView: View {
     var body: some View {
         NavigationStack {
             List {
+                Section("이 기기") {
+                    OnDeviceModelRow()
+                }
+
                 if model.modelConnections.isEmpty {
-                    ContentUnavailableView {
-                        Label("등록된 모델 없음", systemImage: "cpu")
-                    } description: {
-                        Text("Ollama, LM Studio 또는 사내 OpenAI 호환 서버를 연결할 수 있습니다.")
-                    } actions: {
-                        Button("모델 서버 추가") {
+                    Section("선택 사항 · 온프레미스 서버") {
+                        Button {
                             showingAddProvider = true
+                        } label: {
+                            Label("외부 모델 서버 추가", systemImage: "server.rack")
                         }
-                        .buttonStyle(.borderedProminent)
                     }
-                    .listRowBackground(Color.clear)
                 } else {
-                    Section("온프레미스 모델") {
+                    Section("선택 사항 · 온프레미스 서버") {
                         ForEach(model.modelConnections) { connection in
                             ModelConnectionRow(connection: connection)
                         }
@@ -31,7 +31,7 @@ struct ModelConnectionsView: View {
 
                 Section {
                     Label {
-                        Text("인증정보는 이 기기의 Keychain에만 저장되며 URL이나 웹 저장소로 전달되지 않습니다.")
+                        Text("내부 모델 추론은 앱 안에서 실행됩니다. 외부 서버 인증정보는 이 기기의 Keychain에만 저장됩니다.")
                     } icon: {
                         Image(systemName: "lock.shield")
                             .foregroundStyle(.tint)
@@ -65,6 +65,128 @@ struct ModelConnectionsView: View {
         }
         for id in ids {
             model.deleteModelConnection(id: id)
+        }
+    }
+}
+
+private struct OnDeviceModelRow: View {
+    @EnvironmentObject private var service: OnDeviceModelService
+    @State private var confirmingRemoval = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "iphone.gen3.radiowaves.left.and.right")
+                    .frame(width: 28, height: 28)
+                    .foregroundStyle(.tint)
+                    .background(
+                        .tint.opacity(0.12),
+                        in: RoundedRectangle(cornerRadius: 8)
+                    )
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(service.descriptor.displayName)
+                        .font(.headline)
+                    Text("Q4_0 · \(service.descriptor.formattedDownloadSize)")
+                        .font(.subheadline.monospaced())
+                        .foregroundStyle(.secondary)
+                    Text("llama.cpp · Metal/CPU · 네트워크 추론 없음")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+
+                Spacer()
+
+                action
+            }
+
+            status
+        }
+        .padding(.vertical, 4)
+        .confirmationDialog(
+            "내부 모델을 삭제할까요?",
+            isPresented: $confirmingRemoval,
+            titleVisibility: .visible
+        ) {
+            Button("모델 삭제", role: .destructive) {
+                Task {
+                    await service.removeModel()
+                }
+            }
+            Button("취소", role: .cancel) {}
+        } message: {
+            Text("약 \(service.descriptor.formattedDownloadSize)의 모델 파일만 삭제되며 다시 다운로드할 수 있습니다.")
+        }
+    }
+
+    @ViewBuilder
+    private var action: some View {
+        switch service.installationState {
+        case .checking, .verifying:
+            ProgressView()
+                .controlSize(.small)
+        case .notInstalled, .failed:
+            Button("다운로드") {
+                service.download()
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+        case .downloading:
+            Button("취소", role: .destructive) {
+                service.cancelDownload()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        case .ready:
+            Menu {
+                Button("무결성 다시 확인") {
+                    Task {
+                        await service.refreshInstallation()
+                    }
+                }
+                Button("모델 삭제", role: .destructive) {
+                    confirmingRemoval = true
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var status: some View {
+        switch service.installationState {
+        case .checking:
+            Label("설치 상태 확인 중…", systemImage: "magnifyingglass")
+                .foregroundStyle(.secondary)
+                .font(.caption)
+        case .notInstalled:
+            Label(
+                "한 번 다운로드하면 인터넷 없이 내부 추론할 수 있습니다.",
+                systemImage: "arrow.down.circle"
+            )
+            .foregroundStyle(.secondary)
+            .font(.caption)
+        case let .downloading(progress):
+            VStack(alignment: .leading, spacing: 5) {
+                ProgressView(value: progress)
+                Text("공식 모델 다운로드 · \(Int(progress * 100))%")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+        case .verifying:
+            Label("파일 크기와 SHA-256 확인 중…", systemImage: "checkmark.shield")
+                .foregroundStyle(.secondary)
+                .font(.caption)
+        case .ready:
+            Label("내부 추론 준비됨", systemImage: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+                .font(.caption.weight(.semibold))
+        case let .failed(message):
+            Label(message, systemImage: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+                .font(.caption)
+                .lineLimit(3)
         }
     }
 }

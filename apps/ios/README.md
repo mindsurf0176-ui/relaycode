@@ -1,10 +1,10 @@
 # RelayCode for iOS
 
 RelayCode for iOS is a native SwiftUI development console. It controls paired
-Mac coding agents, connects directly to private OpenAI-compatible models, and
-boots an isolated Linux/BusyBox terminal on-device. Full repository toolchains
-remain on the paired Mac; the current Linux guest is a separate ephemeral
-workspace.
+Mac coding agents, runs a downloaded coding model directly on the Apple device,
+can connect to private OpenAI-compatible models, and boots an isolated
+Linux/BusyBox terminal on-device. Full repository toolchains remain on the
+paired Mac; the current Linux guest is a separate ephemeral workspace.
 
 ## Run on a device
 
@@ -36,7 +36,20 @@ Local Xcode is optional for contributors. Every pull request runs
 runner. Installing the app on a physical iPhone or publishing through
 TestFlight still requires Apple signing.
 
-## Connect an on-premises model
+## Run the internal model on-device
+
+Open the **Models** tab and download the pinned Qwen2.5-Coder 0.5B Q4_0 model
+(about 429 MB). RelayCode downloads the artifact from Qwen's official pinned
+revision, verifies both its exact byte count and SHA-256, excludes the
+re-downloadable file from backups, and protects it with iOS file protection.
+
+Inference runs in-process through the official pinned `llama.cpp` XCFramework.
+The prompt and output do not leave the device. The first response after opening
+the app takes longer because the GGUF weights must be mapped and the Metal
+backend initialized. The current internal model uses a 4,096-token context and
+generates at most 384 tokens per response.
+
+## Connect an optional on-premises model
 
 Open the **Models** tab, add the private HTTPS base URL ending in `/v1`, and use
 **Check connection and models**. Ollama and LM Studio normally do not need an
@@ -45,8 +58,9 @@ can store a bearer token in device-only Keychain storage.
 
 The app calls `GET <base-url>/models`, lets the user select or enter a model ID,
 and never places the credential in the endpoint URL, web storage, or profile
-JSON. The **Inference** tab sends real `POST <base-url>/chat/completions`
-requests to the selected model and displays the returned assistant response.
+JSON. The **Inference** tab defaults to the internal model and can optionally
+send real `POST <base-url>/chat/completions` requests to the selected private
+server.
 
 ## Run Linux on-device
 
@@ -76,12 +90,27 @@ npm run ios:test:model-live
 Override `RELAYCODE_MODEL_BASE_URL`, `RELAYCODE_MODEL_ID`, and optionally
 `RELAYCODE_MODEL_TOKEN` for another OpenAI-compatible server.
 
+To download the pinned GGUF and exercise the same in-process
+`OnDeviceInferenceEngine` used by the iOS app:
+
+```bash
+npm run ios:test:on-device-model-live
+```
+
+The first run downloads about 429 MB into the ignored `artifacts/` directory.
+The test validates the exact byte count and SHA-256 before requiring a real
+generated marker from llama.cpp.
+
 ## Security boundary
 
 - Pairing is stored as a generic Keychain password with
   `WhenUnlockedThisDeviceOnly` accessibility and no iCloud synchronization.
 - Model endpoint credentials use separate `WhenUnlockedThisDeviceOnly`
   Keychain items. Profiles contain only a credential reference.
+- The internal GGUF model is downloaded only after an explicit tap and is
+  verified against a pinned SHA-256 before it can be loaded.
+- Internal inference runs inside the app process; its prompts are not sent over
+  the network.
 - Model prompts are sent only when the user taps **Send**, directly to the
   selected endpoint.
 - The Linux guest cannot access iOS files or the network in this slice.

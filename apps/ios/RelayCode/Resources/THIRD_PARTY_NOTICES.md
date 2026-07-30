@@ -1,5 +1,32 @@
 # Third-party notices
 
+## llama.cpp
+
+RelayCode uses the official `llama.cpp` XCFramework to execute downloaded GGUF
+language models directly on Apple devices without a network inference service.
+
+- Project: <https://github.com/ggml-org/llama.cpp>
+- Release: `b10182`
+- Commit: `afeebe103bd99cda8f5dfaefcabadf890db7fda7`
+- License: MIT
+
+The complete license text is bundled as
+`OnDeviceModel/llama-cpp-license.txt`.
+
+## Qwen2.5-Coder-0.5B-Instruct-GGUF
+
+RelayCode can download the Q4_0 GGUF artifact from Qwen's official repository
+after an explicit user action. The model is not included in the app binary.
+
+- Project: <https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF>
+- Revision: `ebb2015119c907b064c512bf053e945850b5875f`
+- Artifact SHA-256:
+  `9739055e046d62a937e5b7879012209ef40ebea8a1569a96028de491f3f091d5`
+- License: Apache-2.0
+
+The complete model license text is bundled as
+`OnDeviceModel/qwen-model-license.txt`.
+
 ## mini-rv32ima
 
 RelayCode's optional on-device Linux runtime uses the `mini-rv32ima`
