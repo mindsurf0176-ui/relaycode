@@ -43,17 +43,27 @@ the one-time setup in [`docs/testflight.md`](../../docs/testflight.md).
 
 ## Run the internal model on-device
 
-Open the **Inference** tab and download the pinned Qwen2.5-Coder 1.5B Q4_K_M
-model (about 1.12 GB). RelayCode downloads the artifact from Qwen's official pinned
-revision, verifies both its exact byte count and SHA-256, excludes the
-re-downloadable file from backups, and protects it with iOS file protection.
+Open the **Models** tab and choose one of two pinned Qwen2.5-Coder Q4_K_M
+artifacts:
+
+- **3B quality** (about 2.10 GB) is the default on iPhones with at least 7 GB of
+  physical memory;
+- **1.5B speed** (about 1.12 GB) is the stable default on lower-memory devices.
+
+Both models execute entirely inside the iPhone app. RelayCode downloads the
+selected artifact from Qwen's official pinned revision, verifies its exact byte
+count and SHA-256, excludes the re-downloadable file from backups, and protects
+it with iOS file protection.
 
 Inference runs in-process through the official pinned `llama.cpp` XCFramework.
-The prompt and output do not leave the device. The first response after opening
-the app takes longer because the GGUF weights must be mapped and the Metal
-backend initialized. The current internal model uses an 8,192-token context,
-generates at most 768 tokens per response, and automatically drops the oldest
-conversation turns when needed to preserve the latest request.
+The prompt and output do not leave the device. RelayCode enables Metal Flash
+Attention and a Q8 KV cache, keeps a verified model resident for five idle
+minutes, reuses the unchanged conversation prefix, and coalesces streamed UI
+updates. Automatic mode adapts context, batch size, and CPU threads to physical
+memory, Low Power Mode, and thermal pressure. Manual low-power, balanced, and
+turbo profiles plus an in-app benchmark remain available. The maximum context
+is 8,192 tokens and the response cap is 768 tokens; older turns are dropped
+when necessary to preserve the latest request.
 
 ## Connect an optional on-premises model
 
@@ -74,7 +84,8 @@ The **Linux** tab boots an actual Linux 6.1.14 RISC-V kernel and Buildroot
 BusyBox userland inside a small interpreter. It does not use JIT, a jailbreak,
 or private APIs. The current guest has:
 
-- 64 MB RAM;
+- 64 MB RAM on constrained devices, or 128 MB on iPhones with at least 6 GB
+  while power and thermal state allow;
 - an ephemeral in-memory filesystem;
 - an interactive UART-backed shell;
 - no guest network or host-folder mount yet.
@@ -103,9 +114,16 @@ To download the pinned GGUF and exercise the same in-process
 npm run ios:test:on-device-model-live
 ```
 
-The first run downloads about 1.12 GB into the ignored `artifacts/` directory.
-The test validates the exact byte count and SHA-256 before requiring a real
-generated marker from llama.cpp.
+The first run downloads the 1.5B smoke-test artifact into the ignored
+`artifacts/` directory. The test validates the exact byte count and SHA-256,
+requires a real generated marker from llama.cpp, and reports first-token,
+prompt, and generation throughput.
+
+Run the same full smoke test against the 3B quality artifact with:
+
+```bash
+RELAYCODE_ON_DEVICE_MODEL=quality npm run ios:test:on-device-model-live
+```
 
 ## Security boundary
 

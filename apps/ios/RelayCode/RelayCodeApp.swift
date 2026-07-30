@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 @main
 struct RelayCodeApp: App {
@@ -10,6 +11,15 @@ struct RelayCodeApp: App {
             RootView()
                 .environmentObject(model)
                 .environmentObject(onDeviceModel)
+                .onReceive(
+                    NotificationCenter.default.publisher(
+                        for: UIApplication.didReceiveMemoryWarningNotification
+                    )
+                ) { _ in
+                    Task {
+                        await onDeviceModel.unload()
+                    }
+                }
         }
     }
 }

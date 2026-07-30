@@ -28,6 +28,8 @@ enum LinuxRuntimeStatus: Equatable {
 final class LinuxRuntimeController: ObservableObject {
     @Published private(set) var status: LinuxRuntimeStatus = .stopped
     @Published private(set) var output = ""
+    let memoryMegabytes: Int
+    let instructionBudget: UInt32
 
     private var didRequestLogin = false
     private var ansiSanitizer = ANSISanitizer()
@@ -35,6 +37,18 @@ final class LinuxRuntimeController: ObservableObject {
         Task { @MainActor [weak self] in
             self?.handle(event)
         }
+    }
+
+    init() {
+        let processInfo = ProcessInfo.processInfo
+        let isConstrained = processInfo.isLowPowerModeEnabled
+            || processInfo.thermalState == .serious
+            || processInfo.thermalState == .critical
+        memoryMegabytes = !isConstrained
+            && processInfo.physicalMemory >= 6_000_000_000
+            ? 128
+            : 64
+        instructionBudget = isConstrained ? 65_536 : 262_144
     }
 
     var canSendInput: Bool {
@@ -62,7 +76,11 @@ final class LinuxRuntimeController: ObservableObject {
             didRequestLogin = false
             ansiSanitizer = ANSISanitizer()
             status = .booting
-            engine.start(image: image)
+            engine.start(
+                image: image,
+                memoryBytes: memoryMegabytes * 1_024 * 1_024,
+                instructionBudget: instructionBudget
+            )
         } catch {
             status = .failed(error.localizedDescription)
         }
@@ -188,12 +206,17 @@ private final class LinuxRuntimeEngine: @unchecked Sendable {
     private let onEvent: @Sendable (LinuxRuntimeEvent) -> Void
     private var virtualMachine: OpaquePointer?
     private var lastStepNanoseconds: UInt64 = 0
+    private var instructionBudget: UInt32 = 65_536
 
     init(onEvent: @escaping @Sendable (LinuxRuntimeEvent) -> Void) {
         self.onEvent = onEvent
     }
 
-    func start(image: Data) {
+    func start(
+        image: Data,
+        memoryBytes: Int,
+        instructionBudget: UInt32
+    ) {
         queue.async { [self] in
             guard virtualMachine == nil else {
                 return
@@ -203,7 +226,7 @@ private final class LinuxRuntimeEngine: @unchecked Sendable {
                     rc_linux_vm_create(
                         bytes.bindMemory(to: UInt8.self).baseAddress,
                         image.count,
-                        64 * 1_024 * 1_024,
+                        memoryBytes,
                         commandLine
                     )
                 }
@@ -213,6 +236,7 @@ private final class LinuxRuntimeEngine: @unchecked Sendable {
                 return
             }
             virtualMachine = machine
+            self.instructionBudget = instructionBudget
             lastStepNanoseconds = DispatchTime.now().uptimeNanoseconds
             onEvent(.started)
             runSlice()
@@ -265,7 +289,7 @@ private final class LinuxRuntimeEngine: @unchecked Sendable {
 
         let result = rc_linux_vm_step(
             virtualMachine,
-            65_536,
+            instructionBudget,
             elapsedMicroseconds
         )
         drainOutput(from: virtualMachine)

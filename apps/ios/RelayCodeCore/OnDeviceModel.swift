@@ -10,6 +10,7 @@ public struct OnDeviceModelDescriptor: Hashable, Sendable {
     public let expectedSHA256: String
     public let contextLength: Int
     public let maximumOutputTokens: Int
+    public let minimumRecommendedMemoryBytes: UInt64
 
     public init(
         id: String,
@@ -19,7 +20,8 @@ public struct OnDeviceModelDescriptor: Hashable, Sendable {
         expectedByteCount: Int64,
         expectedSHA256: String,
         contextLength: Int,
-        maximumOutputTokens: Int
+        maximumOutputTokens: Int,
+        minimumRecommendedMemoryBytes: UInt64
     ) {
         precondition(expectedByteCount > 0)
         precondition(expectedSHA256.range(
@@ -36,9 +38,10 @@ public struct OnDeviceModelDescriptor: Hashable, Sendable {
         self.expectedSHA256 = expectedSHA256
         self.contextLength = contextLength
         self.maximumOutputTokens = maximumOutputTokens
+        self.minimumRecommendedMemoryBytes = minimumRecommendedMemoryBytes
     }
 
-    public static let relayCodeCoder = OnDeviceModelDescriptor(
+    public static let relayCodeCoderSpeed = OnDeviceModelDescriptor(
         id: "qwen2.5-coder-1.5b-instruct-q4_k_m",
         displayName: "Qwen2.5 Coder 1.5B",
         filename: "qwen2.5-coder-1.5b-instruct-q4_k_m.gguf",
@@ -48,8 +51,30 @@ public struct OnDeviceModelDescriptor: Hashable, Sendable {
         expectedByteCount: 1_117_320_768,
         expectedSHA256: "cc324af070c2ecbfd324a30884d2f951a7ff756aba85cb811a6ec436933bb046",
         contextLength: 8_192,
-        maximumOutputTokens: 768
+        maximumOutputTokens: 768,
+        minimumRecommendedMemoryBytes: 4_000_000_000
     )
+
+    public static let relayCodeCoderQuality = OnDeviceModelDescriptor(
+        id: "qwen2.5-coder-3b-instruct-q4_k_m",
+        displayName: "Qwen2.5 Coder 3B",
+        filename: "qwen2.5-coder-3b-instruct-q4_k_m.gguf",
+        downloadURL: URL(
+            string: "https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF/resolve/f74adce6aa16316c625447af059dbebe4983757c/qwen2.5-coder-3b-instruct-q4_k_m.gguf?download=true"
+        )!,
+        expectedByteCount: 2_104_932_800,
+        expectedSHA256: "724fb256bec1ff062b2f65e4569e871ad2e95ab2a3989723d1769c54294730b7",
+        contextLength: 8_192,
+        maximumOutputTokens: 768,
+        minimumRecommendedMemoryBytes: 7_000_000_000
+    )
+
+    public static let relayCodeCoder = relayCodeCoderSpeed
+
+    public static let relayCodeModels = [
+        relayCodeCoderQuality,
+        relayCodeCoderSpeed,
+    ]
 
     public static let legacyFilenames = [
         "qwen2.5-coder-0.5b-instruct-q4_0.gguf",
@@ -60,6 +85,12 @@ public struct OnDeviceModelDescriptor: Hashable, Sendable {
             fromByteCount: expectedByteCount,
             countStyle: .file
         )
+    }
+
+    public static func recommended(forPhysicalMemory bytes: UInt64) -> Self {
+        bytes >= relayCodeCoderQuality.minimumRecommendedMemoryBytes
+            ? relayCodeCoderQuality
+            : relayCodeCoderSpeed
     }
 }
 

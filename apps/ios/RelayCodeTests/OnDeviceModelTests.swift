@@ -17,6 +17,54 @@ func recommendedOnDeviceModelIsPinnedToHTTPSAndExpectedArtifact() {
 }
 
 @Test
+func qualityOnDeviceModelIsPinnedAndRecommendedOnlyWithEnoughMemory() {
+    let model = OnDeviceModelDescriptor.relayCodeCoderQuality
+
+    #expect(model.downloadURL.scheme == "https")
+    #expect(model.downloadURL.path.contains("f74adce6aa16316c625447af059dbebe4983757c"))
+    #expect(model.expectedByteCount == 2_104_932_800)
+    #expect(model.expectedSHA256 == "724fb256bec1ff062b2f65e4569e871ad2e95ab2a3989723d1769c54294730b7")
+    #expect(OnDeviceModelDescriptor.recommended(forPhysicalMemory: 8_000_000_000) == model)
+    #expect(
+        OnDeviceModelDescriptor.recommended(forPhysicalMemory: 6_000_000_000)
+            == .relayCodeCoderSpeed
+    )
+}
+
+@Test
+func automaticPerformanceProfileRespondsToMemoryAndThermalPressure() {
+    let coolEnvironment = OnDeviceRuntimeEnvironment(
+        physicalMemoryBytes: 8_000_000_000,
+        processorCount: 8,
+        isLowPowerModeEnabled: false,
+        thermalLevel: .nominal
+    )
+    let turbo = OnDeviceInferenceConfiguration.resolve(
+        requestedMode: .automatic,
+        environment: coolEnvironment,
+        descriptor: .relayCodeCoderQuality
+    )
+    #expect(turbo.resolvedMode == .turbo)
+    #expect(turbo.contextLength == 8_192)
+    #expect(turbo.usesQuantizedKVCache)
+
+    let hotEnvironment = OnDeviceRuntimeEnvironment(
+        physicalMemoryBytes: 8_000_000_000,
+        processorCount: 8,
+        isLowPowerModeEnabled: false,
+        thermalLevel: .serious
+    )
+    let constrained = OnDeviceInferenceConfiguration.resolve(
+        requestedMode: .turbo,
+        environment: hotEnvironment,
+        descriptor: .relayCodeCoderQuality
+    )
+    #expect(constrained.resolvedMode == .lowPower)
+    #expect(constrained.contextLength == 4_096)
+    #expect(constrained.threadCount == 3)
+}
+
+@Test
 func qwenPromptKeepsRoleBoundariesAndNeutralizesInjectedControlTokens() throws {
     let prompt = try QwenChatPromptFormatter.format(messages: [
         ModelChatMessage(

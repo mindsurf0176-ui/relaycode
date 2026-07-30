@@ -59,9 +59,6 @@ struct InferenceView: View {
         }
         .onDisappear {
             stopInference()
-            Task {
-                await onDeviceModel.unload()
-            }
         }
     }
 
@@ -73,7 +70,11 @@ struct InferenceView: View {
 
                     if isOnDeviceSelected && !onDeviceModel.installationState.isReady {
                         onDeviceSetup
-                    } else if messages.isEmpty {
+                    } else if isOnDeviceSelected {
+                        onDevicePerformanceCard
+                    }
+
+                    if onDeviceModel.installationState.isReady && messages.isEmpty {
                         Label(
                             privacyMessage,
                             systemImage: isOnDeviceSelected
@@ -113,6 +114,104 @@ struct InferenceView: View {
             .safeAreaInset(edge: .bottom) {
                 composer
             }
+        }
+    }
+
+    private var onDevicePerformanceCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("아이폰 성능", systemImage: "gauge.with.dots.needle.50percent")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Text(onDeviceModel.activeConfiguration.resolvedMode.displayName)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+            }
+
+            Picker(
+                "성능 모드",
+                selection: Binding(
+                    get: { onDeviceModel.performanceMode },
+                    set: { onDeviceModel.setPerformanceMode($0) }
+                )
+            ) {
+                ForEach(OnDevicePerformanceMode.allCases, id: \.self) { mode in
+                    Text(mode.displayName).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .disabled(isGenerating || onDeviceModel.isBenchmarking)
+
+            let configuration = onDeviceModel.activeConfiguration
+            Text(
+                "컨텍스트 \(configuration.contextLength / 1_024)K · Q8 KV · "
+                    + "\(configuration.threadCount)스레드"
+            )
+            .font(.caption.monospaced())
+            .foregroundStyle(.secondary)
+
+            if let metrics = onDeviceModel.lastMetrics {
+                HStack(spacing: 16) {
+                    metric(
+                        title: "첫 토큰",
+                        value: String(format: "%.2f초", metrics.firstTokenMilliseconds / 1_000)
+                    )
+                    metric(
+                        title: "생성 속도",
+                        value: String(
+                            format: "%.1f tok/s",
+                            metrics.generatedTokensPerSecond
+                        )
+                    )
+                    metric(
+                        title: "캐시 재사용",
+                        value: "\(metrics.reusedPromptTokenCount) tok"
+                    )
+                }
+            }
+
+            if let benchmarkErrorMessage = onDeviceModel.benchmarkErrorMessage {
+                Label(
+                    benchmarkErrorMessage,
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .font(.caption)
+                .foregroundStyle(.orange)
+            }
+
+            Button {
+                Task {
+                    await onDeviceModel.runBenchmark()
+                }
+            } label: {
+                if onDeviceModel.isBenchmarking {
+                    HStack {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("측정 중…")
+                    }
+                } else {
+                    Label("현재 설정 성능 측정", systemImage: "stopwatch")
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(isGenerating || onDeviceModel.isBenchmarking)
+        }
+        .padding(14)
+        .background(
+            Color(uiColor: .secondarySystemGroupedBackground),
+            in: RoundedRectangle(cornerRadius: 16)
+        )
+    }
+
+    private func metric(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+            Text(value)
+                .font(.caption.monospacedDigit().weight(.semibold))
         }
     }
 
@@ -271,7 +370,9 @@ struct InferenceView: View {
     }
 
     private var canSend: Bool {
-        guard !normalizedPrompt.isEmpty, !isGenerating else {
+        guard !normalizedPrompt.isEmpty,
+              !isGenerating,
+              !onDeviceModel.isBenchmarking else {
             return false
         }
         if isOnDeviceSelected {

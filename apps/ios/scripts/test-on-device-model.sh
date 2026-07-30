@@ -4,11 +4,27 @@ set -euo pipefail
 IOS_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 REPO_DIR="$(cd "$IOS_DIR/../.." && pwd)"
 MODEL_DIR="$REPO_DIR/artifacts/on-device-model"
-MODEL_PATH="$MODEL_DIR/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf"
+MODEL_VARIANT="${RELAYCODE_ON_DEVICE_MODEL:-speed}"
+case "$MODEL_VARIANT" in
+  speed)
+    MODEL_FILENAME="qwen2.5-coder-1.5b-instruct-q4_k_m.gguf"
+    MODEL_URL="https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/f86cb2c1fa58255f8052cc32aeede1b7482d4361/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf?download=true"
+    MODEL_SHA256="cc324af070c2ecbfd324a30884d2f951a7ff756aba85cb811a6ec436933bb046"
+    MODEL_BYTES="1117320768"
+    ;;
+  quality)
+    MODEL_FILENAME="qwen2.5-coder-3b-instruct-q4_k_m.gguf"
+    MODEL_URL="https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF/resolve/f74adce6aa16316c625447af059dbebe4983757c/qwen2.5-coder-3b-instruct-q4_k_m.gguf?download=true"
+    MODEL_SHA256="724fb256bec1ff062b2f65e4569e871ad2e95ab2a3989723d1769c54294730b7"
+    MODEL_BYTES="2104932800"
+    ;;
+  *)
+    echo "RELAYCODE_ON_DEVICE_MODEL must be speed or quality." >&2
+    exit 2
+    ;;
+esac
+MODEL_PATH="$MODEL_DIR/$MODEL_FILENAME"
 MODEL_PARTIAL="$MODEL_PATH.partial"
-MODEL_URL="https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/f86cb2c1fa58255f8052cc32aeede1b7482d4361/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf?download=true"
-MODEL_SHA256="cc324af070c2ecbfd324a30884d2f951a7ff756aba85cb811a6ec436933bb046"
-MODEL_BYTES="1117320768"
 BUILD_DIR="$(mktemp -d /tmp/relaycode-on-device-smoke.XXXXXX)"
 LLAMA_FRAMEWORKS="$IOS_DIR/RelayCodeLlamaRuntime/vendor/llama.xcframework/macos-arm64_x86_64"
 SOURCE_DIR="$BUILD_DIR/Sources"

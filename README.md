@@ -90,15 +90,19 @@ Do not use Tailscale Funnel, public router forwarding, or a bridge bound to
   iOS app without exposing credentials to the web client.
 - Run real chat completions against the selected on-premises model from a
   native conversation surface.
+- Run a pinned 3B quality or 1.5B speed coding model entirely inside the iPhone
+  with adaptive thermal/memory profiles, Metal Flash Attention, quantized KV
+  cache, prefix reuse, and an in-app performance meter.
 - Boot a bundled RISC-V Linux 6.1 kernel and execute BusyBox shell commands
   entirely on-device through a no-JIT interpreter.
 
 RelayCode is an operations console rather than a clone of an existing chat app:
 active work, blocked approvals, results, and diffs take priority over prose.
 
-The Linux guest currently uses 64 MB of memory, an ephemeral in-memory
-filesystem, and no guest network or host-folder mount. Its pinned interpreter
-and image are downloaded and checksum-verified during the iOS build; see
+The Linux guest uses 64 MB on constrained devices or 128 MB on higher-memory
+iPhones, an ephemeral in-memory filesystem, and no guest network or host-folder
+mount. Its pinned interpreter and image are downloaded and checksum-verified
+during the iOS build; see
 [`apps/ios/RelayCode/Resources/THIRD_PARTY_NOTICES.md`](apps/ios/RelayCode/Resources/THIRD_PARTY_NOTICES.md).
 
 ## Native iOS app

@@ -15,6 +15,7 @@
 		1CFCC552282429992F3566BD /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = DCE3F0B317F8859BCEED12EB /* PrivacyInfo.xcprivacy */; };
 		24FEF24130DE0B569846C763 /* OnDeviceInferenceEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = F920B36702F91BB78722CB95 /* OnDeviceInferenceEngine.swift */; };
 		331EA6D761AD6F0A6061F8E9 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AF84183E266329C40DB4F82 /* RootView.swift */; };
+		5460107AE96BDBBC6B0F708E /* OnDevicePerformance.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACBFE7F9C936FF0B0149BDED /* OnDevicePerformance.swift */; };
 		57D06B36937378F28D73CA7D /* THIRD_PARTY_NOTICES.md in Resources */ = {isa = PBXBuildFile; fileRef = 361E2F11FC911183D99661AC /* THIRD_PARTY_NOTICES.md */; };
 		5FCF7394FD742B69CD9DC74C /* OnDeviceModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 271FD1F28FFA7012205F4656 /* OnDeviceModel.swift */; };
 		6B8D260918573123E6FFAC71 /* InferenceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F0393C9D2CD5410B31A318C /* InferenceView.swift */; };
@@ -111,6 +112,7 @@
 		931AC3241B03B868895E6A93 /* RelayCode.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = RelayCode.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9765264F37FAE682268A5C72 /* RelayCodeLinuxRuntime.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RelayCodeLinuxRuntime.h; sourceTree = "<group>"; };
 		9EA534F8C94838D37CA8D68B /* OpenAICompatibleModelClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAICompatibleModelClient.swift; sourceTree = "<group>"; };
+		ACBFE7F9C936FF0B0149BDED /* OnDevicePerformance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnDevicePerformance.swift; sourceTree = "<group>"; };
 		B1481B815900D2405BE5869C /* LinuxRuntimeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinuxRuntimeController.swift; sourceTree = "<group>"; };
 		B164BEE8CCC0189EF1314CDD /* KeychainPairingStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainPairingStore.swift; sourceTree = "<group>"; };
 		B20887649FA79BD7196A4EB9 /* mini-rv32ima.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "mini-rv32ima.h"; sourceTree = "<group>"; };
@@ -261,6 +263,7 @@
 			isa = PBXGroup;
 			children = (
 				271FD1F28FFA7012205F4656 /* OnDeviceModel.swift */,
+				ACBFE7F9C936FF0B0149BDED /* OnDevicePerformance.swift */,
 				9EA534F8C94838D37CA8D68B /* OpenAICompatibleModelClient.swift */,
 				16DE46CAE64E4B7C1B66BD7B /* PairingConfiguration.swift */,
 				FF34D962ABAC79634E65428C /* RuntimeProfile.swift */,
@@ -403,6 +406,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				5FCF7394FD742B69CD9DC74C /* OnDeviceModel.swift in Sources */,
+				5460107AE96BDBBC6B0F708E /* OnDevicePerformance.swift in Sources */,
 				DB4AB038B491B3EBAF15A38D /* OpenAICompatibleModelClient.swift in Sources */,
 				18CEA6657D14DF006A0B7357 /* PairingConfiguration.swift in Sources */,
 				F741BF6850B94FF92D806689 /* RuntimeProfile.swift in Sources */,
@@ -510,7 +514,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 0.3.0;
+				MARKETING_VERSION = 0.4.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -675,7 +679,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 0.3.0;
+				MARKETING_VERSION = 0.4.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

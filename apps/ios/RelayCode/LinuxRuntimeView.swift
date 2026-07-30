@@ -48,7 +48,10 @@ struct LinuxRuntimeView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(controller.status.label)
                     .font(.subheadline.weight(.semibold))
-                Text("Linux 6.1 · riscv32 · RAM 64MB · 휘발성")
+                Text(
+                    "Linux 6.1 · riscv32 · RAM "
+                        + "\(controller.memoryMegabytes)MB · 휘발성"
+                )
                     .font(.caption.monospaced())
                     .foregroundStyle(.secondary)
             }
@@ -153,6 +156,7 @@ struct LinuxRuntimeView: View {
         실제 RISC-V Linux 커널과 BusyBox 셸이 iPhone 안에서 실행됩니다.
 
         • JIT 또는 탈옥을 사용하지 않습니다.
+        • 기기 메모리와 전력 상태에 맞춰 RAM과 CPU 실행량을 조절합니다.
         • 파일 변경은 현재 세션 RAM에만 남습니다.
         • 네트워크와 호스트 파일 접근은 아직 연결하지 않았습니다.
         """

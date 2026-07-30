@@ -75,6 +75,19 @@ private struct OnDeviceModelRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            Picker(
+                "내부 모델",
+                selection: Binding(
+                    get: { service.descriptor.id },
+                    set: { service.selectModel(id: $0) }
+                )
+            ) {
+                ForEach(service.availableModels, id: \.id) { model in
+                    Text(model.displayName).tag(model.id)
+                }
+            }
+            .pickerStyle(.segmented)
+
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "iphone.gen3.radiowaves.left.and.right")
                     .frame(width: 28, height: 28)
@@ -87,7 +100,7 @@ private struct OnDeviceModelRow: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(service.descriptor.displayName)
                         .font(.headline)
-                    Text("Q4_0 · \(service.descriptor.formattedDownloadSize)")
+                    Text("Q4_K_M · \(service.descriptor.formattedDownloadSize)")
                         .font(.subheadline.monospaced())
                         .foregroundStyle(.secondary)
                     Text("llama.cpp · Metal/CPU · 네트워크 추론 없음")
@@ -101,6 +114,30 @@ private struct OnDeviceModelRow: View {
             }
 
             status
+
+            if service.descriptor == .relayCodeCoderQuality,
+               !service.isQualityModelRecommended {
+                Label(
+                    "이 기기의 메모리에서는 1.5B 모델이 더 안정적입니다. 3B는 앱 종료나 발열 제한이 생길 수 있습니다.",
+                    systemImage: "memorychip"
+                )
+                .font(.caption)
+                .foregroundStyle(.orange)
+            } else if service.descriptor == .relayCodeCoderQuality {
+                Label(
+                    "코드 품질 우선 · 메모리가 충분한 아이폰에 권장",
+                    systemImage: "sparkles"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            } else {
+                Label(
+                    "속도와 메모리 안정성 우선",
+                    systemImage: "bolt.fill"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
         }
         .padding(.vertical, 4)
         .confirmationDialog(

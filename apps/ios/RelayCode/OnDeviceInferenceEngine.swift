@@ -2,15 +2,24 @@ import Foundation
 import llama
 import RelayCodeCore
 
+enum OnDeviceInferenceEvent: Sendable {
+    case token(String)
+    case metrics(OnDeviceInferenceMetrics)
+}
+
 actor OnDeviceInferenceEngine {
     private let resources = OnDeviceLlamaResources()
     private var loadedModelURL: URL?
+    private var loadedConfiguration: OnDeviceInferenceConfiguration?
+    private var cachedTokens: [llama_token] = []
 
     nonisolated func tokenStream(
         modelURL: URL,
         descriptor: OnDeviceModelDescriptor,
-        messages: [ModelChatMessage]
-    ) -> AsyncThrowingStream<String, Error> {
+        messages: [ModelChatMessage],
+        configuration: OnDeviceInferenceConfiguration,
+        maximumOutputTokens: Int? = nil
+    ) -> AsyncThrowingStream<OnDeviceInferenceEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
@@ -18,6 +27,8 @@ actor OnDeviceInferenceEngine {
                         modelURL: modelURL,
                         descriptor: descriptor,
                         messages: messages,
+                        configuration: configuration,
+                        maximumOutputTokens: maximumOutputTokens,
                         continuation: continuation
                     )
                     continuation.finish()
@@ -34,24 +45,35 @@ actor OnDeviceInferenceEngine {
     func unload() {
         resources.unload()
         loadedModelURL = nil
+        loadedConfiguration = nil
+        cachedTokens.removeAll(keepingCapacity: false)
     }
 
     private func generate(
         modelURL: URL,
         descriptor: OnDeviceModelDescriptor,
         messages: [ModelChatMessage],
-        continuation: AsyncThrowingStream<String, Error>.Continuation
+        configuration: OnDeviceInferenceConfiguration,
+        maximumOutputTokens: Int?,
+        continuation: AsyncThrowingStream<OnDeviceInferenceEvent, Error>.Continuation
     ) throws {
         try Task.checkCancellation()
-        try loadModelIfNeeded(at: modelURL, descriptor: descriptor)
+        let requestStartedAt = Date.timeIntervalSinceReferenceDate
+        let modelLoadMilliseconds = try loadModelIfNeeded(
+            at: modelURL,
+            configuration: configuration
+        )
 
         guard let context = resources.context,
               let vocab = resources.vocab else {
             throw OnDeviceInferenceError.modelNotLoaded
         }
 
-        let maximumPromptTokens = descriptor.contextLength
-            - descriptor.maximumOutputTokens
+        let outputTokenLimit = min(
+            maximumOutputTokens ?? descriptor.maximumOutputTokens,
+            descriptor.maximumOutputTokens
+        )
+        let maximumPromptTokens = configuration.contextLength - outputTokenLimit
         var retainedMessages = messages
         var prompt = try QwenChatPromptFormatter.format(
             messages: retainedMessages
@@ -75,29 +97,66 @@ actor OnDeviceInferenceEngine {
             throw OnDeviceInferenceError.contextTooLarge
         }
 
+        guard outputTokenLimit > 0 else {
+            throw OnDeviceInferenceError.invalidOutputLimit
+        }
+
         let sampler = llama_sampler_chain_init(llama_sampler_chain_default_params())
         llama_sampler_chain_add(sampler, llama_sampler_init_top_k(20))
         llama_sampler_chain_add(sampler, llama_sampler_init_top_p(0.85, 1))
         llama_sampler_chain_add(sampler, llama_sampler_init_temp(0.15))
         llama_sampler_chain_add(sampler, llama_sampler_init_dist(0x52434F44))
+        var preserveCache = false
         defer {
             llama_sampler_free(sampler)
-            llama_memory_clear(llama_get_memory(context), true)
+            if !preserveCache {
+                llama_memory_clear(llama_get_memory(context), false)
+                cachedTokens.removeAll(keepingCapacity: true)
+            }
         }
 
-        var batch = llama_batch_init(512, 0, 1)
+        var batch = llama_batch_init(Int32(configuration.batchSize), 0, 1)
         defer {
             llama_batch_free(batch)
         }
 
-        llama_memory_clear(llama_get_memory(context), true)
-        try decodePrompt(promptTokens, context: context, batch: &batch)
+        let memory = llama_get_memory(context)
+        var reusablePrefixCount = commonPrefixCount(
+            cachedTokens,
+            promptTokens
+        )
+        if reusablePrefixCount == promptTokens.count {
+            reusablePrefixCount = max(0, reusablePrefixCount - 1)
+        }
+        if reusablePrefixCount == 0 {
+            llama_memory_clear(memory, false)
+        } else if !llama_memory_seq_rm(
+            memory,
+            0,
+            Int32(reusablePrefixCount),
+            -1
+        ) {
+            llama_memory_clear(memory, false)
+            reusablePrefixCount = 0
+        }
+        cachedTokens = Array(cachedTokens.prefix(reusablePrefixCount))
+
+        llama_perf_context_reset(context)
+        try decodePrompt(
+            promptTokens,
+            startingAt: reusablePrefixCount,
+            chunkSize: configuration.batchSize,
+            context: context,
+            batch: &batch
+        )
 
         var position = Int32(promptTokens.count)
         var pendingUTF8: [UInt8] = []
-        var generatedText = ""
+        var generatedPieces: [String] = []
+        var generatedTokens: [llama_token] = []
+        var firstTokenMilliseconds = 0.0
 
-        for _ in 0..<descriptor.maximumOutputTokens {
+        for _ in 0..<outputTokenLimit {
             try Task.checkCancellation()
 
             let token = llama_sampler_sample(sampler, context, -1)
@@ -105,12 +164,17 @@ actor OnDeviceInferenceEngine {
                 break
             }
             llama_sampler_accept(sampler, token)
+            if generatedTokens.isEmpty {
+                firstTokenMilliseconds = (
+                    Date.timeIntervalSinceReferenceDate - requestStartedAt
+                ) * 1_000
+            }
 
             pendingUTF8.append(contentsOf: tokenBytes(token, vocabulary: vocab))
             if let piece = String(bytes: pendingUTF8, encoding: .utf8) {
                 pendingUTF8.removeAll(keepingCapacity: true)
-                generatedText += piece
-                continuation.yield(piece)
+                generatedPieces.append(piece)
+                continuation.yield(.token(piece))
             }
 
             clearBatch(&batch)
@@ -123,34 +187,64 @@ actor OnDeviceInferenceEngine {
             guard llama_decode(context, batch) == 0 else {
                 throw OnDeviceInferenceError.decodeFailed
             }
+            generatedTokens.append(token)
             position += 1
         }
 
         if !pendingUTF8.isEmpty {
             let tail = String(decoding: pendingUTF8, as: UTF8.self)
-            generatedText += tail
-            continuation.yield(tail)
+            generatedPieces.append(tail)
+            continuation.yield(.token(tail))
         }
 
+        let generatedText = generatedPieces.joined()
         guard !generatedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw OnDeviceInferenceError.emptyCompletion
         }
+
+        cachedTokens = promptTokens + generatedTokens
+        preserveCache = true
+
+        let performance = llama_perf_context(context)
+        let promptSeconds = max(0.001, performance.t_p_eval_ms / 1_000)
+        let generationSeconds = max(0.001, performance.t_eval_ms / 1_000)
+        continuation.yield(
+            .metrics(
+                OnDeviceInferenceMetrics(
+                    modelLoadMilliseconds: modelLoadMilliseconds,
+                    firstTokenMilliseconds: firstTokenMilliseconds,
+                    promptTokenCount: promptTokens.count,
+                    reusedPromptTokenCount: reusablePrefixCount,
+                    promptTokensPerSecond: Double(
+                        promptTokens.count - reusablePrefixCount
+                    ) / promptSeconds,
+                    generatedTokenCount: generatedTokens.count,
+                    generatedTokensPerSecond: Double(generatedTokens.count)
+                        / generationSeconds,
+                    configuration: configuration
+                )
+            )
+        )
     }
 
     private func loadModelIfNeeded(
         at modelURL: URL,
-        descriptor: OnDeviceModelDescriptor
-    ) throws {
+        configuration: OnDeviceInferenceConfiguration
+    ) throws -> Double {
         let normalizedURL = modelURL.standardizedFileURL
         if loadedModelURL == normalizedURL,
+           loadedConfiguration == configuration,
            resources.model != nil,
            resources.context != nil {
-            return
+            return 0
         }
 
+        let loadStartedAt = Date.timeIntervalSinceReferenceDate
         unload()
         var modelParameters = llama_model_default_params()
-        modelParameters.check_tensors = true
+        // The service verifies the pinned artifact's byte count and SHA-256 before
+        // this path, so re-reading every tensor here only delays each cold load.
+        modelParameters.check_tensors = false
 #if targetEnvironment(simulator)
         modelParameters.n_gpu_layers = 0
 #else
@@ -165,12 +259,17 @@ actor OnDeviceInferenceEngine {
         }
 
         var contextParameters = llama_context_default_params()
-        contextParameters.n_ctx = UInt32(descriptor.contextLength)
-        contextParameters.n_batch = 512
-        contextParameters.n_ubatch = 512
-        let threads = max(1, min(6, ProcessInfo.processInfo.activeProcessorCount - 2))
-        contextParameters.n_threads = Int32(threads)
-        contextParameters.n_threads_batch = Int32(threads)
+        contextParameters.n_ctx = UInt32(configuration.contextLength)
+        contextParameters.n_batch = UInt32(configuration.batchSize)
+        contextParameters.n_ubatch = UInt32(configuration.microBatchSize)
+        contextParameters.n_threads = Int32(configuration.threadCount)
+        contextParameters.n_threads_batch = Int32(configuration.threadCount)
+        contextParameters.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_ENABLED
+        contextParameters.no_perf = false
+        if configuration.usesQuantizedKVCache {
+            contextParameters.type_k = GGML_TYPE_Q8_0
+            contextParameters.type_v = GGML_TYPE_Q8_0
+        }
 
         guard let loadedContext = llama_init_from_model(
             loadedModel,
@@ -184,18 +283,24 @@ actor OnDeviceInferenceEngine {
         resources.context = loadedContext
         resources.vocab = llama_model_get_vocab(loadedModel)
         loadedModelURL = normalizedURL
+        loadedConfiguration = configuration
+        return (
+            Date.timeIntervalSinceReferenceDate - loadStartedAt
+        ) * 1_000
     }
 
     private func decodePrompt(
         _ tokens: [llama_token],
+        startingAt initialOffset: Int,
+        chunkSize: Int,
         context: OpaquePointer,
         batch: inout llama_batch
     ) throws {
-        var offset = 0
+        var offset = initialOffset
         while offset < tokens.count {
             try Task.checkCancellation()
             clearBatch(&batch)
-            let end = min(offset + 512, tokens.count)
+            let end = min(offset + chunkSize, tokens.count)
             for index in offset..<end {
                 addToken(
                     tokens[index],
@@ -209,6 +314,18 @@ actor OnDeviceInferenceEngine {
             }
             offset = end
         }
+    }
+
+    private func commonPrefixCount(
+        _ lhs: [llama_token],
+        _ rhs: [llama_token]
+    ) -> Int {
+        var index = 0
+        let limit = min(lhs.count, rhs.count)
+        while index < limit, lhs[index] == rhs[index] {
+            index += 1
+        }
+        return index
     }
 
     private func tokenize(
@@ -337,6 +454,7 @@ enum OnDeviceInferenceError: LocalizedError {
     case tokenizationFailed
     case decodeFailed
     case emptyCompletion
+    case invalidOutputLimit
 
     var errorDescription: String? {
         switch self {
@@ -354,6 +472,8 @@ enum OnDeviceInferenceError: LocalizedError {
             "내부 모델 추론 중 llama.cpp 디코딩이 실패했습니다."
         case .emptyCompletion:
             "내부 모델이 비어 있는 응답을 생성했습니다."
+        case .invalidOutputLimit:
+            "내부 모델의 출력 토큰 한도가 올바르지 않습니다."
         }
     }
 }
