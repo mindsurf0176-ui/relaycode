@@ -63,6 +63,11 @@ with iOS file protection.
 Gemma 4 runs through Google's pinned `LiteRT-LM` Swift runtime. Its official
 binary and Swift wrapper sources are checksum-verified during the build; a
 small pinned patch exposes LiteRT-LM's native maximum-output-token option.
+The app requests Apple's extended virtual address space and increased memory
+limit entitlements because Gemma 4 maps a very large embedding section as one
+contiguous region on iOS. It also discards only stale per-model MTP Metal cache
+files before a new engine initialization to avoid a known LiteRT-LM relaunch
+failure while keeping speculative decoding enabled.
 Qwen runs through the pinned `llama.cpp` XCFramework with Metal Flash
 Attention, a Q8 KV cache, and unchanged-prefix reuse. The prompt and output do
 not leave the device. Both paths keep the verified model resident for five idle

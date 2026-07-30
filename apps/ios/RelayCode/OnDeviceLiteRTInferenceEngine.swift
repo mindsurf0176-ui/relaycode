@@ -164,6 +164,10 @@ actor OnDeviceLiteRTInferenceEngine {
         unload()
         let loadStartedAt = Date.timeIntervalSinceReferenceDate
         let cacheDirectory = try prepareCacheDirectory()
+        removeStaleSpeculativeDecodingCaches(
+            for: normalizedURL,
+            cacheDirectory: cacheDirectory
+        )
 
         ExperimentalFlags.optIntoExperimentalAPIs()
         ExperimentalFlags.enableBenchmark = true
@@ -203,6 +207,36 @@ actor OnDeviceLiteRTInferenceEngine {
         var mutableDirectory = directory
         try mutableDirectory.setResourceValues(values)
         return directory
+    }
+
+    private func removeStaleSpeculativeDecodingCaches(
+        for modelURL: URL,
+        cacheDirectory: URL
+    ) {
+        let modelFilename = modelURL.lastPathComponent
+        let roots = [
+            cacheDirectory,
+            FileManager.default.temporaryDirectory,
+        ]
+
+        for root in roots {
+            guard let candidates = try? FileManager.default.contentsOfDirectory(
+                at: root,
+                includingPropertiesForKeys: nil,
+                options: [.skipsHiddenFiles]
+            ) else {
+                continue
+            }
+            for candidate in candidates {
+                let filename = candidate.lastPathComponent
+                guard filename.hasPrefix(modelFilename),
+                      filename.contains("mldrift_"),
+                      filename.hasSuffix("_cache.bin") else {
+                    continue
+                }
+                try? FileManager.default.removeItem(at: candidate)
+            }
+        }
     }
 }
 

@@ -103,8 +103,15 @@ fi
 
 plutil -lint \
   "$IOS_DIR/RelayCode/Info.plist" \
+  "$IOS_DIR/RelayCode/RelayCode.entitlements" \
   "$IOS_DIR/RelayCode/PrivacyInfo.xcprivacy" \
   "$ASSET_DIR/asset-info.plist"
+
+plutil -convert json -o - "$IOS_DIR/RelayCode/RelayCode.entitlements" \
+  | jq -e '
+      .["com.apple.developer.kernel.extended-virtual-addressing"] == true
+      and .["com.apple.developer.kernel.increased-memory-limit"] == true
+    ' >/dev/null
 
 file "$LINK_DIR/RelayCode"
 echo "RelayCode iOS verification passed."

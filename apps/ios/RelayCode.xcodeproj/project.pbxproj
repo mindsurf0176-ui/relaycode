@@ -133,6 +133,7 @@
 		3740B3CD49AB7A2D551542E3 /* litertlm-license.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "litertlm-license.txt"; sourceTree = "<group>"; };
 		3B6EC74F09C5BAD1DB604051 /* RelayCode-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "RelayCode-Bridging-Header.h"; sourceTree = "<group>"; };
 		3F0393C9D2CD5410B31A318C /* InferenceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InferenceView.swift; sourceTree = "<group>"; };
+		3F592FC8446A9C4E4C83B2CE /* RelayCode.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RelayCode.entitlements; sourceTree = "<group>"; };
 		413D708C8E5348FF850A32D3 /* Message.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Message.swift; sourceTree = "<group>"; };
 		426B0C87DA27FBE320319CC8 /* Conversation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Conversation.swift; sourceTree = "<group>"; };
 		4313CB7173C1509F91BB73F8 /* LiteRTLMError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiteRTLMError.swift; sourceTree = "<group>"; };
@@ -326,6 +327,7 @@
 				1A10C8782F0025D33C0AE6CD /* OnDeviceModelService.swift */,
 				DCE3F0B317F8859BCEED12EB /* PrivacyInfo.xcprivacy */,
 				3B6EC74F09C5BAD1DB604051 /* RelayCode-Bridging-Header.h */,
+				3F592FC8446A9C4E4C83B2CE /* RelayCode.entitlements */,
 				1256C5C2184BAE2FC698EC48 /* RelayCodeApp.swift */,
 				6AF84183E266329C40DB4F82 /* RootView.swift */,
 				CBFD2B92A73510B020D1ADF2 /* WebContainerView.swift */,
@@ -744,6 +746,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = RelayCode/RelayCode.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
@@ -773,6 +776,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = RelayCode/RelayCode.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
