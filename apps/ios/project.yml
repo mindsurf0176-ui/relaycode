@@ -31,6 +31,7 @@ targets:
     platform: iOS
     sources:
       - path: RelayCode
+      - path: RelayCodeLinuxRuntime
     dependencies:
       - target: RelayCodeCore
     settings:
@@ -42,6 +43,10 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         TARGETED_DEVICE_FAMILY: "1,2"
         SWIFT_STRICT_CONCURRENCY: targeted
+        SWIFT_OBJC_BRIDGING_HEADER: RelayCode/RelayCode-Bridging-Header.h
+        HEADER_SEARCH_PATHS:
+          - "$(SRCROOT)/RelayCodeLinuxRuntime/include"
+          - "$(SRCROOT)/RelayCodeLinuxRuntime/vendor"
     scheme:
       testTargets:
         - RelayCodeTests

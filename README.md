@@ -86,18 +86,30 @@ Do not use Tailscale Funnel, public router forwarding, or a bridge bound to
 - Review turn diffs and interrupt active work.
 - Inspect account usage and rate-limit windows.
 - Switch between explicitly configured workspace roots.
+- Register and verify private OpenAI-compatible model endpoints from the native
+  iOS app without exposing credentials to the web client.
+- Run real chat completions against the selected on-premises model from a
+  native conversation surface.
+- Boot a bundled RISC-V Linux 6.1 kernel and execute BusyBox shell commands
+  entirely on-device through a no-JIT interpreter.
 
 RelayCode is an operations console rather than a clone of an existing chat app:
 active work, blocked approvals, results, and diffs take priority over prose.
 
-## Native iOS source
+The Linux guest currently uses 64 MB of memory, an ephemeral in-memory
+filesystem, and no guest network or host-folder mount. Its pinned interpreter
+and image are downloaded and checksum-verified during the iOS build; see
+[`apps/ios/RelayCode/Resources/THIRD_PARTY_NOTICES.md`](apps/ios/RelayCode/Resources/THIRD_PARTY_NOTICES.md).
 
-The repository also contains an optional SwiftUI shell with device-only Keychain
-storage, same-origin `WKWebView` containment, and foreground reconnect. The PWA
-is the recommended public-alpha client because it requires no App Store or
-Xcode installation.
+## Native iOS app
 
-See [apps/ios/README.md](apps/ios/README.md) to build the native shell.
+The repository contains a SwiftUI app with device-only Keychain storage,
+same-origin `WKWebView` containment, direct on-premises inference, and an
+interpreted on-device Linux terminal. The PWA remains the fastest way to use
+the remote console without installing an iOS build.
+
+See [apps/ios/README.md](apps/ios/README.md) for local and GitHub-hosted build
+instructions.
 
 ## Security
 
@@ -143,6 +155,10 @@ For release and iOS verification:
 npm run release:package
 npm run ios:verify
 ```
+
+Pull requests also run the complete unsigned iOS build on GitHub's macOS
+runner, so contributors do not need a local Xcode installation for compile
+verification.
 
 ## Project status
 

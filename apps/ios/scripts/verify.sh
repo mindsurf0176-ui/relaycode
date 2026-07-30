@@ -10,10 +10,12 @@ ASSET_DIR="$(mktemp -d /tmp/relaycode-ios-assets.XXXXXX)"
 cd "$REPO_DIR"
 npm run ios:typecheck
 npm run ios:test
+"$IOS_DIR/scripts/test-linux-runtime.sh"
 
 xcrun --sdk iphoneos swiftc \
   -emit-module \
   -emit-object \
+  -whole-module-optimization \
   -parse-as-library \
   -module-name RelayCodeCore \
   -target arm64-apple-ios17.0 \
@@ -22,6 +24,14 @@ xcrun --sdk iphoneos swiftc \
   -o "$LINK_DIR/RelayCodeCore.o" \
   "$IOS_DIR"/RelayCodeCore/*.swift
 
+xcrun --sdk iphoneos clang \
+  -target arm64-apple-ios17.0 \
+  -isysroot "$IOS_SDK" \
+  -I "$IOS_DIR/RelayCodeLinuxRuntime/include" \
+  -I "$IOS_DIR/RelayCodeLinuxRuntime/vendor" \
+  -c "$IOS_DIR/RelayCodeLinuxRuntime/RelayCodeLinuxRuntime.c" \
+  -o "$LINK_DIR/RelayCodeLinuxRuntime.o"
+
 xcrun --sdk iphoneos swiftc \
   -emit-executable \
   -parse-as-library \
@@ -29,8 +39,11 @@ xcrun --sdk iphoneos swiftc \
   -target arm64-apple-ios17.0 \
   -sdk "$IOS_SDK" \
   -I "$LINK_DIR" \
+  -import-objc-header "$IOS_DIR/RelayCode/RelayCode-Bridging-Header.h" \
+  -Xcc -I"$IOS_DIR/RelayCodeLinuxRuntime/include" \
   "$IOS_DIR"/RelayCode/*.swift \
   "$LINK_DIR/RelayCodeCore.o" \
+  "$LINK_DIR/RelayCodeLinuxRuntime.o" \
   -o "$LINK_DIR/RelayCode"
 
 ACTOOL_REPORT="$ASSET_DIR/actool-report.plist"

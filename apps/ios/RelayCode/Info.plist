@@ -40,6 +40,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>RelayCode connects to development hosts and model servers you choose on your private network.</string>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>

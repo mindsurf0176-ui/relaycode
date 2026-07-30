@@ -44,6 +44,20 @@ public struct PairingConfiguration: Codable, Hashable, Sendable {
         self.webURL = webURL
     }
 
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        try self.init(
+            token: container.decode(String.self, forKey: .token),
+            bridgeURL: container.decode(URL.self, forKey: .bridgeURL)
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(token, forKey: .token)
+        try container.encode(bridgeURL, forKey: .bridgeURL)
+    }
+
     public static func parse(_ input: String) throws -> PairingConfiguration {
         let value = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let components = URLComponents(string: value) else {
@@ -64,6 +78,11 @@ public struct PairingConfiguration: Codable, Hashable, Sendable {
         }
 
         return try PairingConfiguration(token: token, bridgeURL: bridgeURL)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case token
+        case bridgeURL
     }
 }
 

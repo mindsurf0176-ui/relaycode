@@ -61,3 +61,38 @@ distribution remains a later convenience layer over the same bridge protocol.
 
 Per-task routes, fallback rules, budget ceilings, sub-agent combinations, and
 quality/cost telemetry derived from real runs.
+
+### Slice 5 — provider routing
+
+Add host-local Ollama and LM Studio, custom Responses-compatible providers,
+native Keychain-backed on-premises endpoints, and truthful provider capability
+checks. Model location and command execution location remain independent.
+
+Current native delivery: provider registration, model discovery, health checks,
+Keychain credentials, and real Chat Completions inference are implemented.
+
+### Slice 6 — native workspace
+
+Add a SwiftUI project browser, editor, search, Git status/diff, and explicit
+write operations for app-container and user-selected Files workspaces. Keep the
+paired remote console as one workspace type rather than the entire native app.
+
+### Slice 7 — on-device inference
+
+Run a small downloaded coding model through MLX Swift or Core ML with storage,
+memory, context, and thermal limits. Use Apple Foundation Models only for
+focused tasks it handles reliably; evaluate Core AI after its iOS 27 beta.
+
+### Slice 8 — local command runtime
+
+Add an audited native command subset and a no-JIT WASI interpreter. Evaluate an
+interpreted Alpine environment as an optional experimental runtime, without
+claiming iOS hardware virtualization or desktop-class background execution.
+
+Current experimental delivery: RelayCode boots Linux 6.1.14 and a BusyBox
+Buildroot userland with a pinned MIT RISC-V interpreter. The UART shell is
+interactive and verified by a boot smoke test. Persistence, workspace mounts,
+and guest networking remain later work.
+
+See [IOS_LOCAL_RUNTIME.md](IOS_LOCAL_RUNTIME.md) for the architecture and App
+Store boundary.

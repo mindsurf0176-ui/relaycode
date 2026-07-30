@@ -13,15 +13,26 @@ final class AppModel: ObservableObject {
     @Published private(set) var pairing: PairingConfiguration?
     @Published private(set) var health: HostHealth = .idle
     @Published private(set) var resumeGeneration = UUID()
+    @Published private(set) var modelConnections: [ModelConnectionConfiguration] = []
     @Published var errorMessage: String?
 
-    private let store: any PairingStoring
+    private let pairingStore: any PairingStoring
+    private let modelStore: any ModelConnectionStoring
     private var healthTask: Task<Void, Never>?
 
-    init(store: any PairingStoring = KeychainPairingStore()) {
-        self.store = store
+    init(
+        pairingStore: any PairingStoring = KeychainPairingStore(),
+        modelStore: any ModelConnectionStoring = KeychainModelConnectionStore()
+    ) {
+        self.pairingStore = pairingStore
+        self.modelStore = modelStore
         do {
-            pairing = try store.load()
+            pairing = try pairingStore.load()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        do {
+            modelConnections = try modelStore.loadConnections()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -50,7 +61,7 @@ final class AppModel: ObservableObject {
     func forgetPairing() {
         healthTask?.cancel()
         do {
-            try store.delete()
+            try pairingStore.delete()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -91,8 +102,53 @@ final class AppModel: ObservableObject {
         }
     }
 
+    func saveModelConnection(
+        _ connection: ModelConnectionConfiguration,
+        credential: String?
+    ) throws {
+        if let reference = connection.credentialReference {
+            let normalizedCredential = credential?.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let normalizedCredential, !normalizedCredential.isEmpty {
+                try modelStore.saveCredential(normalizedCredential, reference: reference)
+            } else {
+                try modelStore.deleteCredential(reference: reference)
+            }
+        }
+
+        var updated = modelConnections.filter { $0.id != connection.id }
+        updated.append(connection)
+        updated.sort {
+            $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending
+        }
+        try modelStore.saveConnections(updated)
+        modelConnections = updated
+    }
+
+    func credential(for connection: ModelConnectionConfiguration) throws -> String? {
+        guard let reference = connection.credentialReference else {
+            return nil
+        }
+        return try modelStore.loadCredential(reference: reference)
+    }
+
+    func deleteModelConnection(id: String) {
+        guard let connection = modelConnections.first(where: { $0.id == id }) else {
+            return
+        }
+        do {
+            let updated = modelConnections.filter { $0.id != id }
+            try modelStore.saveConnections(updated)
+            modelConnections = updated
+            if let reference = connection.credentialReference {
+                try modelStore.deleteCredential(reference: reference)
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     private func persist(_ value: PairingConfiguration) throws {
-        try store.save(value)
+        try pairingStore.save(value)
         pairing = value
         errorMessage = nil
         resumeGeneration = UUID()

@@ -12,6 +12,15 @@ an SSH key.
   `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`; it is not synchronized through
   iCloud and is injected into the web runtime without writing the token to web
   storage.
+- Native model profiles store only a Keychain reference. Provider bearer
+  credentials use separate `WhenUnlockedThisDeviceOnly` items and are attached
+  only as authorization headers to explicit model requests.
+- Remote model endpoints require HTTPS. Loopback HTTP is accepted only for
+  local development, and credentials, query strings, and fragments are rejected
+  in provider URLs.
+- The on-device Linux guest uses interpreted CPU execution without JIT. It has
+  no iOS filesystem bridge or guest network device, and its RAM-backed state is
+  discarded when stopped.
 - Native web navigation is limited to the configured RelayCode origin.
 - Rotating pairing credentials invalidates an existing client on its next
   protocol message.
@@ -52,3 +61,7 @@ Only the latest tagged release is supported during the public alpha.
 - Android Keystore support is not implemented.
 - The first adapter is Codex. Additional provider adapters must preserve the same
   approval and workspace boundary instead of forwarding provider APIs blindly.
+- Direct on-premises prompts leave the device and are processed by the endpoint
+  selected by the user. RelayCode does not currently redact prompt contents.
+- The Linux runtime is experimental and intentionally lacks persistent storage,
+  package downloads, networking, and workspace mounts.

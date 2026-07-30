@@ -35,4 +35,13 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run ios:verify
+      - name: Show Apple toolchain
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Verify Swift, security contracts, and bootable Linux runtime
+        run: npm run ios:verify
+      - name: Build complete unsigned iOS app
+        run: npm run ios:build

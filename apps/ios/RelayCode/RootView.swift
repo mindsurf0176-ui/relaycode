@@ -5,18 +5,44 @@ import UIKit
 struct RootView: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.scenePhase) private var scenePhase
+    @State private var selectedTab: RootTab = .remote
 
     var body: some View {
-        Group {
-            if let pairing = model.pairing {
-                NativeWebShell(pairing: pairing)
-            } else {
-                PairingView()
+        TabView(selection: $selectedTab) {
+            Group {
+                if let pairing = model.pairing {
+                    NativeWebShell(pairing: pairing)
+                } else {
+                    PairingView()
+                }
             }
+            .tabItem {
+                Label("원격", systemImage: "antenna.radiowaves.left.and.right")
+            }
+            .tag(RootTab.remote)
+
+            ModelConnectionsView()
+                .tabItem {
+                    Label("모델", systemImage: "cpu")
+                }
+                .tag(RootTab.models)
+
+            InferenceView()
+                .tabItem {
+                    Label("추론", systemImage: "sparkles")
+                }
+                .tag(RootTab.inference)
+
+            LinuxRuntimeView()
+                .tabItem {
+                    Label("Linux", systemImage: "terminal")
+                }
+                .tag(RootTab.linux)
         }
         .preferredColorScheme(.dark)
         .onOpenURL { url in
             model.importPairing(url.absoluteString)
+            selectedTab = .remote
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
@@ -159,7 +185,7 @@ private struct NativeWebShell: View {
                 onError: { model.errorMessage = $0 }
             )
             .id(pairing)
-            .ignoresSafeArea()
+            .ignoresSafeArea(.container, edges: .top)
 
             if case let .offline(message) = model.health {
                 Button {
@@ -180,4 +206,11 @@ private struct NativeWebShell: View {
             model.refreshHealth()
         }
     }
+}
+
+private enum RootTab: Hashable {
+    case remote
+    case models
+    case inference
+    case linux
 }
