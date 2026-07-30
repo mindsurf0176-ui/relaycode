@@ -65,6 +65,11 @@ GitHub Environment를 만들고 네 값을 GitHub의 암호화된 Environment Se
 외부 TestFlight 또는 App Store 제출용으로 전환할 수 없습니다. 외부 테스트가
 필요해지면 검증 완료 후 새 빌드를 만들면서 해당 옵션을 끕니다.
 
+워크플로가 아직 기본 브랜치에 합쳐지기 전의 기능 브랜치를 실물 기기에서 먼저
+검증하려면, 해당 커밋에 `testflight-*` 형식의 태그를 푸시할 수 있습니다.
+태그 빌드는 `com.minseo.relaycode`, 버전 `0.2.0`, 내부 테스터 전용 설정으로만
+업로드됩니다.
+
 ## 실물 iPhone 검증 항목
 
 - 내부 모델 약 429 MB 다운로드와 SHA-256 검증

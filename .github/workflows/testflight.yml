@@ -1,6 +1,9 @@
 name: TestFlight
 
 on:
+  push:
+    tags:
+      - "testflight-*"
   workflow_dispatch:
     inputs:
       bundle_id:
@@ -37,9 +40,9 @@ jobs:
       APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
       APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
       APP_STORE_CONNECT_PRIVATE_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
-      BUNDLE_ID: ${{ inputs.bundle_id }}
-      MARKETING_VERSION: ${{ inputs.marketing_version }}
-      INTERNAL_ONLY: ${{ inputs.internal_only }}
+      BUNDLE_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.bundle_id || 'com.minseo.relaycode' }}
+      MARKETING_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.marketing_version || '0.2.0' }}
+      INTERNAL_ONLY: ${{ github.event_name == 'push' || inputs.internal_only }}
       ARCHIVE_PATH: ${{ github.workspace }}/build/RelayCode.xcarchive
       EXPORT_PATH: ${{ github.workspace }}/build/RelayCode-export
       EXPORT_OPTIONS_PATH: ${{ github.workspace }}/build/RelayCode-ExportOptions.plist
