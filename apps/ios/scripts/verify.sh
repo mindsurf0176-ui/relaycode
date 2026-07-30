@@ -7,23 +7,31 @@ IOS_SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
 LINK_DIR="$(mktemp -d /tmp/relaycode-ios-link.XXXXXX)"
 ASSET_DIR="$(mktemp -d /tmp/relaycode-ios-assets.XXXXXX)"
 LLAMA_FRAMEWORKS="$IOS_DIR/RelayCodeLlamaRuntime/vendor/llama.xcframework/ios-arm64"
+SOURCE_DIR="$LINK_DIR/Sources"
 
 cd "$REPO_DIR"
 npm run ios:typecheck
 npm run ios:test
 "$IOS_DIR/scripts/test-linux-runtime.sh"
+mkdir -p "$SOURCE_DIR/RelayCodeCore" "$SOURCE_DIR/RelayCode"
+find "$IOS_DIR/RelayCodeCore" -maxdepth 1 -type f -name '*.swift' \
+  ! -name '* [0-9]*.swift' -exec cp {} "$SOURCE_DIR/RelayCodeCore/" \;
+find "$IOS_DIR/RelayCode" -maxdepth 1 -type f -name '*.swift' \
+  ! -name '* [0-9]*.swift' -exec cp {} "$SOURCE_DIR/RelayCode/" \;
 
 xcrun --sdk iphoneos swiftc \
   -emit-module \
   -emit-object \
   -whole-module-optimization \
   -parse-as-library \
+  -swift-version 6 \
+  -strict-concurrency=targeted \
   -module-name RelayCodeCore \
   -target arm64-apple-ios17.0 \
   -sdk "$IOS_SDK" \
   -emit-module-path "$LINK_DIR/RelayCodeCore.swiftmodule" \
   -o "$LINK_DIR/RelayCodeCore.o" \
-  "$IOS_DIR"/RelayCodeCore/*.swift
+  "$SOURCE_DIR"/RelayCodeCore/*.swift
 
 xcrun --sdk iphoneos clang \
   -target arm64-apple-ios17.0 \
@@ -36,6 +44,8 @@ xcrun --sdk iphoneos clang \
 xcrun --sdk iphoneos swiftc \
   -emit-executable \
   -parse-as-library \
+  -swift-version 6 \
+  -strict-concurrency=targeted \
   -module-name RelayCode \
   -target arm64-apple-ios17.0 \
   -sdk "$IOS_SDK" \
@@ -43,7 +53,7 @@ xcrun --sdk iphoneos swiftc \
   -F "$LLAMA_FRAMEWORKS" \
   -import-objc-header "$IOS_DIR/RelayCode/RelayCode-Bridging-Header.h" \
   -Xcc -I"$IOS_DIR/RelayCodeLinuxRuntime/include" \
-  "$IOS_DIR"/RelayCode/*.swift \
+  "$SOURCE_DIR"/RelayCode/*.swift \
   "$LINK_DIR/RelayCodeCore.o" \
   "$LINK_DIR/RelayCodeLinuxRuntime.o" \
   -framework llama \

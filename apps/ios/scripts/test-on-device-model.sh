@@ -11,11 +11,17 @@ MODEL_SHA256="9739055e046d62a937e5b7879012209ef40ebea8a1569a96028de491f3f091d5"
 MODEL_BYTES="428730240"
 BUILD_DIR="$(mktemp -d /tmp/relaycode-on-device-smoke.XXXXXX)"
 LLAMA_FRAMEWORKS="$IOS_DIR/RelayCodeLlamaRuntime/vendor/llama.xcframework/macos-arm64_x86_64"
+SOURCE_DIR="$BUILD_DIR/Sources"
 
 trap 'rm -rf "$BUILD_DIR"' EXIT
 
 "$IOS_DIR/scripts/prepare-llama-runtime.sh"
 mkdir -p "$MODEL_DIR"
+mkdir -p "$SOURCE_DIR/RelayCodeCore" "$SOURCE_DIR/RelayCode"
+find "$IOS_DIR/RelayCodeCore" -maxdepth 1 -type f -name '*.swift' \
+  ! -name '* [0-9]*.swift' -exec cp {} "$SOURCE_DIR/RelayCodeCore/" \;
+cp "$IOS_DIR/RelayCode/OnDeviceInferenceEngine.swift" "$SOURCE_DIR/RelayCode/"
+cp "$IOS_DIR/scripts/on-device-model-smoke.swift" "$SOURCE_DIR/"
 
 if [ ! -f "$MODEL_PATH" ] \
   || [ "$(stat -f %z "$MODEL_PATH")" != "$MODEL_BYTES" ] \
@@ -34,18 +40,22 @@ xcrun swiftc \
   -emit-object \
   -whole-module-optimization \
   -parse-as-library \
+  -swift-version 6 \
+  -strict-concurrency=targeted \
   -module-name RelayCodeCore \
   -emit-module-path "$BUILD_DIR/RelayCodeCore.swiftmodule" \
   -o "$BUILD_DIR/RelayCodeCore.o" \
-  "$IOS_DIR"/RelayCodeCore/*.swift
+  "$SOURCE_DIR"/RelayCodeCore/*.swift
 
 xcrun swiftc \
   -parse-as-library \
+  -swift-version 6 \
+  -strict-concurrency=targeted \
   -module-name RelayCodeOnDeviceSmoke \
   -I "$BUILD_DIR" \
   -F "$LLAMA_FRAMEWORKS" \
-  "$IOS_DIR/RelayCode/OnDeviceInferenceEngine.swift" \
-  "$IOS_DIR/scripts/on-device-model-smoke.swift" \
+  "$SOURCE_DIR/RelayCode/OnDeviceInferenceEngine.swift" \
+  "$SOURCE_DIR/on-device-model-smoke.swift" \
   "$BUILD_DIR/RelayCodeCore.o" \
   -framework llama \
   -Xlinker -rpath \

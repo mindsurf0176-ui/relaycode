@@ -32,7 +32,7 @@
     "ios:prepare": "bash apps/ios/scripts/prepare-linux-runtime.sh && bash apps/ios/scripts/prepare-llama-runtime.sh",
     "ios:generate": "npm run ios:prepare && cd apps/ios && xcodegen generate",
     "ios:typecheck": "bash apps/ios/scripts/typecheck.sh",
-    "ios:test": "cd apps/ios && swift test",
+    "ios:test": "bash apps/ios/scripts/test-core.sh",
     "ios:test:model-live": "bash apps/ios/scripts/test-live-model.sh",
     "ios:test:on-device-model-live": "bash apps/ios/scripts/test-on-device-model.sh",
     "ios:verify": "bash apps/ios/scripts/verify.sh",

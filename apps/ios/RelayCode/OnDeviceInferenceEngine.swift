@@ -3,24 +3,8 @@ import llama
 import RelayCodeCore
 
 actor OnDeviceInferenceEngine {
-    private var model: OpaquePointer?
-    private var context: OpaquePointer?
-    private var vocab: OpaquePointer?
+    private let resources = OnDeviceLlamaResources()
     private var loadedModelURL: URL?
-
-    init() {
-        llama_backend_init()
-    }
-
-    deinit {
-        if let context {
-            llama_free(context)
-        }
-        if let model {
-            llama_model_free(model)
-        }
-        llama_backend_free()
-    }
 
     nonisolated func tokenStream(
         modelURL: URL,
@@ -48,15 +32,7 @@ actor OnDeviceInferenceEngine {
     }
 
     func unload() {
-        if let context {
-            llama_free(context)
-        }
-        if let model {
-            llama_model_free(model)
-        }
-        context = nil
-        model = nil
-        vocab = nil
+        resources.unload()
         loadedModelURL = nil
     }
 
@@ -69,7 +45,8 @@ actor OnDeviceInferenceEngine {
         try Task.checkCancellation()
         try loadModelIfNeeded(at: modelURL, descriptor: descriptor)
 
-        guard let context, let vocab else {
+        guard let context = resources.context,
+              let vocab = resources.vocab else {
             throw OnDeviceInferenceError.modelNotLoaded
         }
 
@@ -146,7 +123,9 @@ actor OnDeviceInferenceEngine {
         descriptor: OnDeviceModelDescriptor
     ) throws {
         let normalizedURL = modelURL.standardizedFileURL
-        if loadedModelURL == normalizedURL, model != nil, context != nil {
+        if loadedModelURL == normalizedURL,
+           resources.model != nil,
+           resources.context != nil {
             return
         }
 
@@ -182,9 +161,9 @@ actor OnDeviceInferenceEngine {
             throw OnDeviceInferenceError.contextCreationFailed
         }
 
-        model = loadedModel
-        context = loadedContext
-        vocab = llama_model_get_vocab(loadedModel)
+        resources.model = loadedModel
+        resources.context = loadedContext
+        resources.vocab = llama_model_get_vocab(loadedModel)
         loadedModelURL = normalizedURL
     }
 
@@ -301,6 +280,33 @@ actor OnDeviceInferenceEngine {
         batch.seq_id[index]![0] = 0
         batch.logits[index] = logits ? 1 : 0
         batch.n_tokens += 1
+    }
+}
+
+private final class OnDeviceLlamaResources: @unchecked Sendable {
+    var model: OpaquePointer?
+    var context: OpaquePointer?
+    var vocab: OpaquePointer?
+
+    init() {
+        llama_backend_init()
+    }
+
+    deinit {
+        unload()
+        llama_backend_free()
+    }
+
+    func unload() {
+        if let context {
+            llama_free(context)
+        }
+        if let model {
+            llama_model_free(model)
+        }
+        context = nil
+        model = nil
+        vocab = nil
     }
 }
 

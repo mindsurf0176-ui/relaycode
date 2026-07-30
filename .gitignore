@@ -19,3 +19,4 @@ apps/ios/RelayCode/Resources/Linux/linux-guest-license.txt
 apps/ios/RelayCode/Resources/OnDeviceModel/llama-cpp-license.txt
 apps/ios/RelayCode/Resources/OnDeviceModel/qwen-model-license.txt
 apps/ios/RelayCode [0-9]*.xcodeproj/
+apps/ios/**/* [0-9]*.swift
