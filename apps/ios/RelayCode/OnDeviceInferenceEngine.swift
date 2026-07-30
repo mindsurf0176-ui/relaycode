@@ -50,16 +50,35 @@ actor OnDeviceInferenceEngine {
             throw OnDeviceInferenceError.modelNotLoaded
         }
 
-        let prompt = try QwenChatPromptFormatter.format(messages: messages)
-        let promptTokens = try tokenize(prompt, vocabulary: vocab)
-        guard promptTokens.count <= descriptor.contextLength - descriptor.maximumOutputTokens else {
+        let maximumPromptTokens = descriptor.contextLength
+            - descriptor.maximumOutputTokens
+        var retainedMessages = messages
+        var prompt = try QwenChatPromptFormatter.format(
+            messages: retainedMessages
+        )
+        var promptTokens = try tokenize(prompt, vocabulary: vocab)
+
+        while promptTokens.count > maximumPromptTokens,
+              retainedMessages.count > 1 {
+            retainedMessages.removeFirst()
+            while retainedMessages.count > 1,
+                  retainedMessages.first?.role == .assistant {
+                retainedMessages.removeFirst()
+            }
+            prompt = try QwenChatPromptFormatter.format(
+                messages: retainedMessages
+            )
+            promptTokens = try tokenize(prompt, vocabulary: vocab)
+        }
+
+        guard promptTokens.count <= maximumPromptTokens else {
             throw OnDeviceInferenceError.contextTooLarge
         }
 
         let sampler = llama_sampler_chain_init(llama_sampler_chain_default_params())
-        llama_sampler_chain_add(sampler, llama_sampler_init_top_k(40))
-        llama_sampler_chain_add(sampler, llama_sampler_init_top_p(0.90, 1))
-        llama_sampler_chain_add(sampler, llama_sampler_init_temp(0.20))
+        llama_sampler_chain_add(sampler, llama_sampler_init_top_k(20))
+        llama_sampler_chain_add(sampler, llama_sampler_init_top_p(0.85, 1))
+        llama_sampler_chain_add(sampler, llama_sampler_init_temp(0.15))
         llama_sampler_chain_add(sampler, llama_sampler_init_dist(0x52434F44))
         defer {
             llama_sampler_free(sampler)
@@ -328,7 +347,7 @@ enum OnDeviceInferenceError: LocalizedError {
         case .contextCreationFailed:
             "내부 모델의 추론 컨텍스트를 만들지 못했습니다."
         case .contextTooLarge:
-            "대화가 내부 모델의 4,096 토큰 컨텍스트를 초과했습니다."
+            "마지막 요청이 내부 모델의 컨텍스트 한도를 초과했습니다."
         case .tokenizationFailed:
             "대화를 내부 모델 토큰으로 변환하지 못했습니다."
         case .decodeFailed:

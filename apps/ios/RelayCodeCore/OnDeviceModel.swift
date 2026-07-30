@@ -39,17 +39,21 @@ public struct OnDeviceModelDescriptor: Hashable, Sendable {
     }
 
     public static let relayCodeCoder = OnDeviceModelDescriptor(
-        id: "qwen2.5-coder-0.5b-instruct-q4_0",
-        displayName: "Qwen2.5 Coder 0.5B",
-        filename: "qwen2.5-coder-0.5b-instruct-q4_0.gguf",
+        id: "qwen2.5-coder-1.5b-instruct-q4_k_m",
+        displayName: "Qwen2.5 Coder 1.5B",
+        filename: "qwen2.5-coder-1.5b-instruct-q4_k_m.gguf",
         downloadURL: URL(
-            string: "https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/ebb2015119c907b064c512bf053e945850b5875f/qwen2.5-coder-0.5b-instruct-q4_0.gguf?download=true"
+            string: "https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/f86cb2c1fa58255f8052cc32aeede1b7482d4361/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf?download=true"
         )!,
-        expectedByteCount: 428_730_240,
-        expectedSHA256: "9739055e046d62a937e5b7879012209ef40ebea8a1569a96028de491f3f091d5",
-        contextLength: 4_096,
-        maximumOutputTokens: 384
+        expectedByteCount: 1_117_320_768,
+        expectedSHA256: "cc324af070c2ecbfd324a30884d2f951a7ff756aba85cb811a6ec436933bb046",
+        contextLength: 8_192,
+        maximumOutputTokens: 768
     )
+
+    public static let legacyFilenames = [
+        "qwen2.5-coder-0.5b-instruct-q4_0.gguf",
+    ]
 
     public var formattedDownloadSize: String {
         ByteCountFormatter.string(
@@ -101,7 +105,14 @@ public enum QwenChatPromptFormatter {
 
         var prompt = """
         <|im_start|>system
-        You are RelayCode, a concise coding assistant running privately on the user's device. Prefer actionable code and explain uncertainty.<|im_end|>
+        You are RelayCode, an offline coding assistant running privately on the user's device.
+        Follow these rules:
+        - Reply in the same language as the user unless asked otherwise.
+        - Give the direct solution first. Prefer correct, complete, runnable code over generic advice.
+        - Preserve the user's stack and constraints. Do not invent APIs, files, command results, or successful execution.
+        - For debugging, identify the likely root cause and provide the smallest safe fix plus a verification step.
+        - When critical context is missing, state one concise assumption or ask one focused question.
+        - Keep explanations compact, but include important edge cases and security risks.<|im_end|>
 
         """
 

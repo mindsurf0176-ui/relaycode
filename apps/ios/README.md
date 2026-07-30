@@ -43,16 +43,17 @@ the one-time setup in [`docs/testflight.md`](../../docs/testflight.md).
 
 ## Run the internal model on-device
 
-Open the **Models** tab and download the pinned Qwen2.5-Coder 0.5B Q4_0 model
-(about 429 MB). RelayCode downloads the artifact from Qwen's official pinned
+Open the **Inference** tab and download the pinned Qwen2.5-Coder 1.5B Q4_K_M
+model (about 1.12 GB). RelayCode downloads the artifact from Qwen's official pinned
 revision, verifies both its exact byte count and SHA-256, excludes the
 re-downloadable file from backups, and protects it with iOS file protection.
 
 Inference runs in-process through the official pinned `llama.cpp` XCFramework.
 The prompt and output do not leave the device. The first response after opening
 the app takes longer because the GGUF weights must be mapped and the Metal
-backend initialized. The current internal model uses a 4,096-token context and
-generates at most 384 tokens per response.
+backend initialized. The current internal model uses an 8,192-token context,
+generates at most 768 tokens per response, and automatically drops the oldest
+conversation turns when needed to preserve the latest request.
 
 ## Connect an optional on-premises model
 
@@ -102,7 +103,7 @@ To download the pinned GGUF and exercise the same in-process
 npm run ios:test:on-device-model-live
 ```
 
-The first run downloads about 429 MB into the ignored `artifacts/` directory.
+The first run downloads about 1.12 GB into the ignored `artifacts/` directory.
 The test validates the exact byte count and SHA-256 before requiring a real
 generated marker from llama.cpp.
 

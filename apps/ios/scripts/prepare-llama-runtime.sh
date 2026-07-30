@@ -35,7 +35,7 @@ fetch_verified \
   "$RESOURCE_DIR/llama-cpp-license.txt"
 
 fetch_verified \
-  "https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF/raw/ebb2015119c907b064c512bf053e945850b5875f/LICENSE" \
+  "https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/raw/f86cb2c1fa58255f8052cc32aeede1b7482d4361/LICENSE" \
   "832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e" \
   "$RESOURCE_DIR/qwen-model-license.txt"
 

@@ -71,6 +71,7 @@ final class OnDeviceModelService: ObservableObject {
                     descriptor: descriptor
                 )
             }.value
+            removeLegacyModels()
             installationState = .ready
         } catch {
             installationState = .failed(message: error.localizedDescription)
@@ -184,6 +185,7 @@ final class OnDeviceModelService: ObservableObject {
             if fileManager.fileExists(atPath: modelURL.path) {
                 try fileManager.removeItem(at: modelURL)
             }
+            removeLegacyModels()
             installationState = .notInstalled
         } catch {
             installationState = .failed(message: error.localizedDescription)
@@ -274,6 +276,7 @@ final class OnDeviceModelService: ObservableObject {
             values.isExcludedFromBackup = true
             var finalURL = modelURL
             try finalURL.setResourceValues(values)
+            removeLegacyModels()
             installationState = .ready
         } catch {
             try? fileManager.removeItem(at: stagingURL)
@@ -309,6 +312,19 @@ final class OnDeviceModelService: ObservableObject {
         guard let available = values.volumeAvailableCapacityForImportantUsage,
               available >= descriptor.expectedByteCount + 300_000_000 else {
             throw OnDeviceModelServiceError.insufficientStorage
+        }
+    }
+
+    private func removeLegacyModels() {
+        for filename in OnDeviceModelDescriptor.legacyFilenames
+        where filename != descriptor.filename {
+            let legacyURL = modelDirectory.appendingPathComponent(
+                filename,
+                isDirectory: false
+            )
+            if fileManager.fileExists(atPath: legacyURL.path) {
+                try? fileManager.removeItem(at: legacyURL)
+            }
         }
     }
 }

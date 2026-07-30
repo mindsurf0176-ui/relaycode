@@ -2,6 +2,16 @@
 
 All notable changes to RelayCode are documented here.
 
+## 0.3.0
+
+- Upgrade the internal model from Qwen2.5-Coder 0.5B Q4_0 to the official
+  Qwen2.5-Coder 1.5B Q4_K_M artifact.
+- Expand the internal inference context from 4,096 to 8,192 tokens and the
+  output budget from 384 to 768 tokens.
+- Improve coding instructions and retain the latest request by trimming old
+  conversation turns when the context is full.
+- Remove the legacy 0.5B model after the upgraded model is verified.
+
 ## 0.1.1
 
 - Avoid overwriting an existing Tailscale Serve endpoint during setup.
