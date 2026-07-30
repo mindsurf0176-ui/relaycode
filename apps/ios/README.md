@@ -36,6 +36,11 @@ Local Xcode is optional for contributors. Every pull request runs
 runner. Installing the app on a physical iPhone or publishing through
 TestFlight still requires Apple signing.
 
+For maintainers with an Apple Developer Program membership, the manual
+**TestFlight** GitHub Actions workflow performs automatic Apple signing and
+uploads an internal build without a locally configured Xcode account. Complete
+the one-time setup in [`docs/testflight.md`](../../docs/testflight.md).
+
 ## Run the internal model on-device
 
 Open the **Models** tab and download the pinned Qwen2.5-Coder 0.5B Q4_0 model
