@@ -13,6 +13,34 @@ language models directly on Apple devices without a network inference service.
 The complete license text is bundled as
 `OnDeviceModel/llama-cpp-license.txt`.
 
+## LiteRT-LM
+
+RelayCode uses Google's official LiteRT-LM Swift package for Gemma 4 inference
+with Metal acceleration and multi-token prediction on iOS.
+
+- Project: <https://github.com/google-ai-edge/LiteRT-LM>
+- Release: `v0.14.0`
+- License: Apache-2.0
+
+The complete license text is bundled as
+`OnDeviceModel/litertlm-license.txt`.
+
+## Gemma 4 E4B
+
+RelayCode can download the official LiteRT-LM deployment artifact after an
+explicit user action. The model is not included in the app binary.
+
+- Model: <https://huggingface.co/google/gemma-4-E4B-it>
+- Deployment artifact:
+  <https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm>
+- Revision: `f7ad3343bd6ebc9607f4dc3bc4f2398bd5749bc5`
+- Artifact SHA-256:
+  `0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0`
+- License: Apache-2.0
+
+The Apache-2.0 license text is bundled as
+`OnDeviceModel/litertlm-license.txt`.
+
 ## Qwen2.5-Coder-1.5B-Instruct-GGUF
 
 RelayCode can download the Q4_K_M GGUF artifact from Qwen's official repository

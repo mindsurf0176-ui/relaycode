@@ -31,7 +31,8 @@ final class OnDeviceModelService: ObservableObject {
     @Published private(set) var isBenchmarking = false
     @Published private(set) var benchmarkErrorMessage: String?
 
-    private let engine = OnDeviceInferenceEngine()
+    private let llamaEngine = OnDeviceInferenceEngine()
+    private let liteRTEngine = OnDeviceLiteRTInferenceEngine()
     private let fileManager: FileManager
     private let session: URLSession
     private let defaults: UserDefaults
@@ -49,16 +50,22 @@ final class OnDeviceModelService: ObservableObject {
         self.session = session
         self.defaults = defaults
 
-        let storedModelID = defaults.string(forKey: DefaultsKey.modelID)
-        let initialDescriptor = OnDeviceModelDescriptor.relayCodeModels.first {
-            $0.id == storedModelID
-        } ?? OnDeviceModelDescriptor.recommended(
-            forPhysicalMemory: ProcessInfo.processInfo.physicalMemory
+        let initialDescriptor = OnDeviceModelDescriptor.initialSelection(
+            storedModelID: defaults.string(forKey: DefaultsKey.modelID),
+            storedCatalogVersion: defaults.integer(
+                forKey: DefaultsKey.modelCatalogVersion
+            ),
+            physicalMemoryBytes: ProcessInfo.processInfo.physicalMemory
         )
         let initialPerformanceMode = OnDevicePerformanceMode(
             rawValue: defaults.string(forKey: DefaultsKey.performanceMode) ?? ""
         ) ?? .automatic
         descriptor = initialDescriptor
+        defaults.set(initialDescriptor.id, forKey: DefaultsKey.modelID)
+        defaults.set(
+            OnDeviceModelDescriptor.currentCatalogVersion,
+            forKey: DefaultsKey.modelCatalogVersion
+        )
         performanceMode = initialPerformanceMode
         activeConfiguration = Self.resolveConfiguration(
             mode: initialPerformanceMode,
@@ -78,9 +85,15 @@ final class OnDeviceModelService: ObservableObject {
         OnDeviceModelDescriptor.relayCodeModels
     }
 
-    var isQualityModelRecommended: Bool {
+    var recommendedDescriptor: OnDeviceModelDescriptor {
+        OnDeviceModelDescriptor.recommended(
+            forPhysicalMemory: ProcessInfo.processInfo.physicalMemory
+        )
+    }
+
+    var isSelectedModelRecommended: Bool {
         ProcessInfo.processInfo.physicalMemory
-            >= OnDeviceModelDescriptor.relayCodeCoderQuality.minimumRecommendedMemoryBytes
+            >= descriptor.minimumRecommendedMemoryBytes
     }
 
     func selectModel(id: String) {
@@ -93,6 +106,10 @@ final class OnDeviceModelService: ObservableObject {
         idleUnloadTask?.cancel()
         descriptor = selected
         defaults.set(selected.id, forKey: DefaultsKey.modelID)
+        defaults.set(
+            OnDeviceModelDescriptor.currentCatalogVersion,
+            forKey: DefaultsKey.modelCatalogVersion
+        )
         activeConfiguration = Self.resolveConfiguration(
             mode: performanceMode,
             descriptor: selected
@@ -100,7 +117,7 @@ final class OnDeviceModelService: ObservableObject {
         lastMetrics = nil
         installationState = .checking
         Task {
-            await engine.unload()
+            await unloadEngines()
             await refreshInstallation()
         }
     }
@@ -117,7 +134,7 @@ final class OnDeviceModelService: ObservableObject {
         )
         lastMetrics = nil
         Task {
-            await engine.unload()
+            await unloadEngines()
         }
     }
 
@@ -251,7 +268,7 @@ final class OnDeviceModelService: ObservableObject {
         downloadTask = nil
         progressTask?.cancel()
         progressTask = nil
-        await engine.unload()
+        await unloadEngines()
         idleUnloadTask?.cancel()
         do {
             if fileManager.fileExists(atPath: modelURL.path) {
@@ -283,7 +300,7 @@ final class OnDeviceModelService: ObservableObject {
         var pendingPieces: [String] = []
         var lastFlush = Date.timeIntervalSinceReferenceDate
         do {
-            let stream = engine.tokenStream(
+            let stream = inferenceStream(
                 modelURL: modelURL,
                 descriptor: descriptor,
                 messages: messages,
@@ -324,7 +341,7 @@ final class OnDeviceModelService: ObservableObject {
     func unload() async {
         idleUnloadTask?.cancel()
         inferenceState = .idle
-        await engine.unload()
+        await unloadEngines()
     }
 
     func runBenchmark() async {
@@ -342,12 +359,12 @@ final class OnDeviceModelService: ObservableObject {
         }
 
         do {
-            await engine.unload()
+            await unloadEngines()
             activeConfiguration = Self.resolveConfiguration(
                 mode: performanceMode,
                 descriptor: descriptor
             )
-            let stream = engine.tokenStream(
+            let stream = inferenceStream(
                 modelURL: modelURL,
                 descriptor: descriptor,
                 messages: [
@@ -424,6 +441,38 @@ final class OnDeviceModelService: ObservableObject {
             try? fileManager.removeItem(at: stagingURL)
             installationState = .failed(message: error.localizedDescription)
         }
+    }
+
+    private func inferenceStream(
+        modelURL: URL,
+        descriptor: OnDeviceModelDescriptor,
+        messages: [ModelChatMessage],
+        configuration: OnDeviceInferenceConfiguration,
+        maximumOutputTokens: Int? = nil
+    ) -> AsyncThrowingStream<OnDeviceInferenceEvent, Error> {
+        switch descriptor.runtime {
+        case .llamaCPP:
+            llamaEngine.tokenStream(
+                modelURL: modelURL,
+                descriptor: descriptor,
+                messages: messages,
+                configuration: configuration,
+                maximumOutputTokens: maximumOutputTokens
+            )
+        case .liteRTLM:
+            liteRTEngine.tokenStream(
+                modelURL: modelURL,
+                descriptor: descriptor,
+                messages: messages,
+                configuration: configuration,
+                maximumOutputTokens: maximumOutputTokens
+            )
+        }
+    }
+
+    private func unloadEngines() async {
+        await llamaEngine.unload()
+        await liteRTEngine.unload()
     }
 
     private var modelDirectory: URL {
@@ -521,6 +570,7 @@ enum OnDeviceModelServiceError: LocalizedError {
 
 private enum DefaultsKey {
     static let modelID = "relaycode.on-device.model-id"
+    static let modelCatalogVersion = "relaycode.on-device.model-catalog-version"
     static let performanceMode = "relaycode.on-device.performance-mode"
 }
 

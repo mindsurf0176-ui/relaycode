@@ -7,6 +7,7 @@ IOS_SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
 LINK_DIR="$(mktemp -d /tmp/relaycode-ios-link.XXXXXX)"
 ASSET_DIR="$(mktemp -d /tmp/relaycode-ios-assets.XXXXXX)"
 LLAMA_FRAMEWORKS="$IOS_DIR/RelayCodeLlamaRuntime/vendor/llama.xcframework/ios-arm64"
+LITERT_FRAMEWORKS="$IOS_DIR/RelayCodeLiteRTRuntime/vendor/CLiteRTLM.xcframework/ios-arm64"
 SOURCE_DIR="$LINK_DIR/Sources"
 
 cd "$REPO_DIR"
@@ -33,6 +34,20 @@ xcrun --sdk iphoneos swiftc \
   -o "$LINK_DIR/RelayCodeCore.o" \
   "$SOURCE_DIR"/RelayCodeCore/*.swift
 
+xcrun --sdk iphoneos swiftc \
+  -emit-module \
+  -emit-object \
+  -whole-module-optimization \
+  -parse-as-library \
+  -swift-version 5 \
+  -module-name LiteRTLM \
+  -target arm64-apple-ios17.0 \
+  -sdk "$IOS_SDK" \
+  -F "$LITERT_FRAMEWORKS" \
+  -emit-module-path "$LINK_DIR/LiteRTLM.swiftmodule" \
+  -o "$LINK_DIR/LiteRTLM.o" \
+  "$IOS_DIR"/RelayCodeLiteRTRuntime/Sources/LiteRTLM/*.swift
+
 xcrun --sdk iphoneos clang \
   -target arm64-apple-ios17.0 \
   -isysroot "$IOS_SDK" \
@@ -51,12 +66,15 @@ xcrun --sdk iphoneos swiftc \
   -sdk "$IOS_SDK" \
   -I "$LINK_DIR" \
   -F "$LLAMA_FRAMEWORKS" \
+  -F "$LITERT_FRAMEWORKS" \
   -import-objc-header "$IOS_DIR/RelayCode/RelayCode-Bridging-Header.h" \
   -Xcc -I"$IOS_DIR/RelayCodeLinuxRuntime/include" \
   "$SOURCE_DIR"/RelayCode/*.swift \
   "$LINK_DIR/RelayCodeCore.o" \
+  "$LINK_DIR/LiteRTLM.o" \
   "$LINK_DIR/RelayCodeLinuxRuntime.o" \
   -framework llama \
+  -framework CLiteRTLM \
   -o "$LINK_DIR/RelayCode"
 
 ACTOOL_REPORT="$ASSET_DIR/actool-report.plist"

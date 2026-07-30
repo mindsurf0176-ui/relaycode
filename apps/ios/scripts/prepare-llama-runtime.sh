@@ -39,6 +39,11 @@ fetch_verified \
   "832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e" \
   "$RESOURCE_DIR/qwen-model-license.txt"
 
+fetch_verified \
+  "https://raw.githubusercontent.com/google-ai-edge/LiteRT-LM/v0.14.0/LICENSE" \
+  "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4" \
+  "$RESOURCE_DIR/litertlm-license.txt"
+
 if [ -f "$VENDOR_DIR/runtime-version.txt" ] \
   && [ "$(cat "$VENDOR_DIR/runtime-version.txt")" = "$STAMP_CONTENT" ] \
   && [ -f "$FRAMEWORK_DIR/Info.plist" ]; then

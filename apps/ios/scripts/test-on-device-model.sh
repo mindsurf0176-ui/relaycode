@@ -37,6 +37,7 @@ mkdir -p "$SOURCE_DIR/RelayCodeCore" "$SOURCE_DIR/RelayCode"
 find "$IOS_DIR/RelayCodeCore" -maxdepth 1 -type f -name '*.swift' \
   ! -name '* [0-9]*.swift' -exec cp {} "$SOURCE_DIR/RelayCodeCore/" \;
 cp "$IOS_DIR/RelayCode/OnDeviceInferenceEngine.swift" "$SOURCE_DIR/RelayCode/"
+cp "$IOS_DIR/RelayCode/OnDeviceInferenceShared.swift" "$SOURCE_DIR/RelayCode/"
 cp "$IOS_DIR/scripts/on-device-model-smoke.swift" "$SOURCE_DIR/"
 
 if [ ! -f "$MODEL_PATH" ] \
@@ -70,6 +71,7 @@ xcrun swiftc \
   -module-name RelayCodeOnDeviceSmoke \
   -I "$BUILD_DIR" \
   -F "$LLAMA_FRAMEWORKS" \
+  "$SOURCE_DIR/RelayCode/OnDeviceInferenceShared.swift" \
   "$SOURCE_DIR/RelayCode/OnDeviceInferenceEngine.swift" \
   "$SOURCE_DIR/on-device-model-smoke.swift" \
   "$BUILD_DIR/RelayCodeCore.o" \

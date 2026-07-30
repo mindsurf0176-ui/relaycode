@@ -86,7 +86,7 @@ private struct OnDeviceModelRow: View {
                     Text(model.displayName).tag(model.id)
                 }
             }
-            .pickerStyle(.segmented)
+            .pickerStyle(.menu)
 
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "iphone.gen3.radiowaves.left.and.right")
@@ -100,10 +100,14 @@ private struct OnDeviceModelRow: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(service.descriptor.displayName)
                         .font(.headline)
-                    Text("Q4_K_M · \(service.descriptor.formattedDownloadSize)")
+                    Text(
+                        "\(service.descriptor.quantizationName) · \(service.descriptor.formattedDownloadSize)"
+                    )
                         .font(.subheadline.monospaced())
                         .foregroundStyle(.secondary)
-                    Text("llama.cpp · Metal/CPU · 네트워크 추론 없음")
+                    Text(
+                        "\(service.descriptor.runtime.displayName) · Metal/CPU · 네트워크 추론 없음"
+                    )
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 }
@@ -115,18 +119,31 @@ private struct OnDeviceModelRow: View {
 
             status
 
-            if service.descriptor == .relayCodeCoderQuality,
-               !service.isQualityModelRecommended {
+            if !service.isSelectedModelRecommended {
                 Label(
-                    "이 기기의 메모리에서는 1.5B 모델이 더 안정적입니다. 3B는 앱 종료나 발열 제한이 생길 수 있습니다.",
+                    "이 기기의 메모리에서는 \(service.recommendedDescriptor.displayName)가 더 안정적입니다. 현재 모델은 앱 종료나 발열 제한이 생길 수 있습니다.",
                     systemImage: "memorychip"
                 )
                 .font(.caption)
                 .foregroundStyle(.orange)
-            } else if service.descriptor == .relayCodeCoderQuality {
+            } else if service.descriptor == .relayCodeGemmaQuality {
                 Label(
-                    "코드 품질 우선 · 메모리가 충분한 아이폰에 권장",
+                    "권장 · Gemma 4 사고 모드와 MTP를 사용하는 최고 품질 설정",
                     systemImage: "sparkles"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            } else if service.descriptor == .relayCodeGemmaBalanced {
+                Label(
+                    "권장 · Gemma 4 사고 모드와 MTP를 사용하는 고속 안정형",
+                    systemImage: "gauge.with.dots.needle.67percent"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            } else if service.descriptor.promptProfile == .quality {
+                Label(
+                    "Qwen 호환 모드 · 더 작은 다운로드가 필요할 때 선택",
+                    systemImage: "checkmark.shield"
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)

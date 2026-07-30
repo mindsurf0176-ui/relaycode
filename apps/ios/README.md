@@ -43,27 +43,43 @@ the one-time setup in [`docs/testflight.md`](../../docs/testflight.md).
 
 ## Run the internal model on-device
 
-Open the **Models** tab and choose one of two pinned Qwen2.5-Coder Q4_K_M
-artifacts:
+Open the **Models** tab and choose one of four pinned artifacts:
 
-- **3B quality** (about 2.10 GB) is the default on iPhones with at least 7 GB of
-  physical memory;
-- **1.5B speed** (about 1.12 GB) is the stable default on lower-memory devices.
+- **Gemma 4 E4B** (about 3.66 GB) is the recommended quality model on iPhones
+  with at least 7 GB of physical memory. It uses Google's mobile QAT weights,
+  Metal, thinking mode, and multi-token prediction;
+- **Gemma 4 E2B** (about 2.59 GB) is the fast, stable default on iPhones with
+  at least 5 GB of physical memory. It keeps the same thinking and MTP path
+  while using substantially less working memory;
+- **Qwen2.5 Coder 3B** (about 2.10 GB) remains a smaller compatibility option;
+- **Qwen2.5 Coder 1.5B** (about 1.12 GB) is the stable speed fallback on
+  devices with less than 5 GB of physical memory.
 
-Both models execute entirely inside the iPhone app. RelayCode downloads the
-selected artifact from Qwen's official pinned revision, verifies its exact byte
-count and SHA-256, excludes the re-downloadable file from backups, and protects
-it with iOS file protection.
+All models execute entirely inside the iPhone app. RelayCode downloads the
+selected artifact from a pinned official revision, verifies its exact byte count
+and SHA-256, excludes the re-downloadable file from backups, and protects it
+with iOS file protection.
 
-Inference runs in-process through the official pinned `llama.cpp` XCFramework.
-The prompt and output do not leave the device. RelayCode enables Metal Flash
-Attention and a Q8 KV cache, keeps a verified model resident for five idle
-minutes, reuses the unchanged conversation prefix, and coalesces streamed UI
-updates. Automatic mode adapts context, batch size, and CPU threads to physical
-memory, Low Power Mode, and thermal pressure. Manual low-power, balanced, and
-turbo profiles plus an in-app benchmark remain available. The maximum context
-is 8,192 tokens and the response cap is 768 tokens; older turns are dropped
-when necessary to preserve the latest request.
+Gemma 4 runs through Google's pinned `LiteRT-LM` Swift runtime. Its official
+binary and Swift wrapper sources are checksum-verified during the build; a
+small pinned patch exposes LiteRT-LM's native maximum-output-token option.
+Qwen runs through the pinned `llama.cpp` XCFramework with Metal Flash
+Attention, a Q8 KV cache, and unchanged-prefix reuse. The prompt and output do
+not leave the device. Both paths keep the verified model resident for five idle
+minutes and coalesce streamed UI updates. Automatic mode adapts context and
+resource settings to physical memory, Low Power Mode, and thermal pressure.
+Manual low-power, balanced, and turbo profiles plus an in-app benchmark remain
+available. The maximum context is 8,192 tokens; the Gemma response budget is
+1,024 tokens and the Qwen budget is 768 tokens.
+
+The internal instruction policy is localized to the user's language and tuned
+per model size. It prioritizes the latest request and explicit constraints,
+requires grounded claims, neutralizes model control tokens inside pasted data,
+and asks a question only when a critical input blocks progress. Gemma 4 uses
+its native system role and private thinking channel; Qwen uses ChatML.
+The 0.5 model-catalog migration replaces a legacy automatic 1.5B selection
+once with the best Gemma tier the device can safely run. Later manual choices
+are preserved.
 
 ## Connect an optional on-premises model
 
@@ -125,13 +141,30 @@ Run the same full smoke test against the 3B quality artifact with:
 RELAYCODE_ON_DEVICE_MODEL=quality npm run ios:test:on-device-model-live
 ```
 
+To download the pinned Gemma 4 E4B artifact and exercise the same LiteRT-LM
+engine, Korean prompt policy, Metal backend, and output limit used by the app:
+
+```bash
+npm run ios:test:gemma-live
+```
+
+The first run downloads about 3.66 GB into the ignored `artifacts/` directory.
+It validates the exact byte count and SHA-256 and requires a real generated
+marker before reporting LiteRT-LM throughput.
+
+Use the E2B stable tier instead with:
+
+```bash
+RELAYCODE_GEMMA_MODEL=e2 npm run ios:test:gemma-live
+```
+
 ## Security boundary
 
 - Pairing is stored as a generic Keychain password with
   `WhenUnlockedThisDeviceOnly` accessibility and no iCloud synchronization.
 - Model endpoint credentials use separate `WhenUnlockedThisDeviceOnly`
   Keychain items. Profiles contain only a credential reference.
-- The internal GGUF model is downloaded only after an explicit tap and is
+- An internal model is downloaded only after an explicit tap and is
   verified against a pinned SHA-256 before it can be loaded.
 - Internal inference runs inside the app process; its prompts are not sent over
   the network.
@@ -154,11 +187,10 @@ npm run ios:verify
 npm run ios:build
 ```
 
-`ios:verify` does not require a bootable Simulator: it typechecks the app, runs
-the provider and pairing tests, boots Linux and executes a shell probe, links a
-real arm64 iOS executable, and validates metadata and assets. `ios:build` is
-the full Xcode build and requires an iOS platform runtime locally or on the
-GitHub macOS runner.
+`ios:verify` does not require a bootable Simulator: it builds a real arm64 iOS
+app, runs the provider and pairing tests, boots Linux and executes a shell
+probe, and validates metadata and assets. `ios:build` runs the same complete
+unsigned Xcode build locally or on the GitHub macOS runner.
 
 Push notifications, multi-device revocation, Android Keystore support, and
 background execution are not part of this slice.

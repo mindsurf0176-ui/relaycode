@@ -90,9 +90,10 @@ Do not use Tailscale Funnel, public router forwarding, or a bridge bound to
   iOS app without exposing credentials to the web client.
 - Run real chat completions against the selected on-premises model from a
   native conversation surface.
-- Run a pinned 3B quality or 1.5B speed coding model entirely inside the iPhone
-  with adaptive thermal/memory profiles, Metal Flash Attention, quantized KV
-  cache, prefix reuse, and an in-app performance meter.
+- Run Gemma 4 E4B or E2B with mobile QAT, Metal, and multi-token prediction
+  entirely inside the iPhone, with Qwen2.5 Coder 3B/1.5B compatibility
+  options, model-specific grounded prompts, adaptive resource profiles, and an
+  in-app performance meter.
 - Boot a bundled RISC-V Linux 6.1 kernel and execute BusyBox shell commands
   entirely on-device through a no-JIT interpreter.
 

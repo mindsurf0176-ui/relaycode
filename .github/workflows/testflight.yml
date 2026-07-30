@@ -14,7 +14,7 @@ on:
       marketing_version:
         description: TestFlight에 표시할 버전
         required: true
-        default: 0.4.0
+        default: 0.5.0
         type: string
       internal_only:
         description: 내부 테스터 전용 빌드로 제한
@@ -42,7 +42,7 @@ jobs:
       APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
       APP_STORE_CONNECT_PRIVATE_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
       BUNDLE_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.bundle_id || 'com.minseo.relaycode' }}
-      MARKETING_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.marketing_version || '0.4.0' }}
+      MARKETING_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.marketing_version || '0.5.0' }}
       INTERNAL_ONLY: ${{ github.event_name == 'push' || inputs.internal_only }}
       ARCHIVE_PATH: ${{ github.workspace }}/build/RelayCode.xcarchive
       EXPORT_PATH: ${{ github.workspace }}/build/RelayCode-export
