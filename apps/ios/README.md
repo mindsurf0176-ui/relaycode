@@ -158,6 +158,12 @@ Use the E2B stable tier instead with:
 RELAYCODE_GEMMA_MODEL=e2 npm run ios:test:gemma-live
 ```
 
+The iOS app performs model downloads with a persistent background
+`URLSession`. The system transfer continues while RelayCode is suspended, and
+the app reconnects to the existing task after a system termination or relaunch.
+Transient failures preserve resumable state; completed staging artifacts are
+recovered before a new transfer is started.
+
 ## Security boundary
 
 - Pairing is stored as a generic Keychain password with
@@ -193,4 +199,5 @@ probe, and validates metadata and assets. `ios:build` runs the same complete
 unsigned Xcode build locally or on the GitHub macOS runner.
 
 Push notifications, multi-device revocation, Android Keystore support, and
-background execution are not part of this slice.
+background agent or inference execution are not part of this slice. Only the
+explicit, user-started model file transfer uses iOS background networking.

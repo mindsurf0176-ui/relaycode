@@ -201,11 +201,14 @@ public enum OnDeviceModelArtifactVerifier {
 
         var hasher = SHA256()
         while true {
-            let data = try handle.read(upToCount: 1_048_576) ?? Data()
-            if data.isEmpty {
+            let bytesRead = try autoreleasepool {
+                let data = try handle.read(upToCount: 1_048_576) ?? Data()
+                hasher.update(data: data)
+                return data.count
+            }
+            if bytesRead == 0 {
                 break
             }
-            hasher.update(data: data)
         }
 
         let digest = hasher.finalize().map {

@@ -1,6 +1,17 @@
 import Foundation
 import RelayCodeCore
 
+enum OnDeviceModelDownloadSession {
+    static let identifier = "com.minseo.relaycode.on-device-model-download"
+}
+
+private struct OnDeviceModelDownloadMetadata: Codable, Sendable {
+    let descriptorID: String
+    let generation: UUID
+    let stagingPath: String
+    let expectedByteCount: Int64
+}
+
 enum OnDeviceModelInstallationState: Equatable {
     case checking
     case notInstalled
@@ -21,7 +32,7 @@ enum OnDeviceInferenceState: Equatable {
 }
 
 @MainActor
-final class OnDeviceModelService: ObservableObject {
+final class OnDeviceModelService: NSObject, ObservableObject {
     @Published private(set) var installationState: OnDeviceModelInstallationState = .checking
     @Published private(set) var inferenceState: OnDeviceInferenceState = .idle
     @Published private(set) var descriptor: OnDeviceModelDescriptor
@@ -34,20 +45,40 @@ final class OnDeviceModelService: ObservableObject {
     private let llamaEngine = OnDeviceInferenceEngine()
     private let liteRTEngine = OnDeviceLiteRTInferenceEngine()
     private let fileManager: FileManager
-    private let session: URLSession
     private let defaults: UserDefaults
+    private lazy var session: URLSession = {
+        let configuration = URLSessionConfiguration.background(
+            withIdentifier: OnDeviceModelDownloadSession.identifier
+        )
+        configuration.sessionSendsLaunchEvents = true
+        configuration.isDiscretionary = false
+        configuration.waitsForConnectivity = true
+        configuration.allowsCellularAccess = true
+        configuration.allowsConstrainedNetworkAccess = true
+        configuration.allowsExpensiveNetworkAccess = true
+        configuration.timeoutIntervalForRequest = 3_600
+        configuration.timeoutIntervalForResource = 7 * 24 * 3_600
+        configuration.httpMaximumConnectionsPerHost = 1
+
+        let delegateQueue = OperationQueue()
+        delegateQueue.name = "RelayCode.ModelDownload"
+        delegateQueue.maxConcurrentOperationCount = 1
+        delegateQueue.qualityOfService = .utility
+        return URLSession(
+            configuration: configuration,
+            delegate: self,
+            delegateQueue: delegateQueue
+        )
+    }()
     private var downloadTask: URLSessionDownloadTask?
-    private var progressTask: Task<Void, Never>?
     private var idleUnloadTask: Task<Void, Never>?
     private var downloadGeneration = UUID()
 
     init(
         fileManager: FileManager = .default,
-        session: URLSession = .shared,
         defaults: UserDefaults = .standard
     ) {
         self.fileManager = fileManager
-        self.session = session
         self.defaults = defaults
 
         let initialDescriptor = OnDeviceModelDescriptor.initialSelection(
@@ -72,9 +103,9 @@ final class OnDeviceModelService: ObservableObject {
             descriptor: initialDescriptor
         )
 
-        Task {
-            await refreshInstallation()
-        }
+        super.init()
+        _ = session
+        reconnectBackgroundDownload()
     }
 
     var modelURL: URL {
@@ -182,7 +213,7 @@ final class OnDeviceModelService: ObservableObject {
         installationState = .downloading(progress: 0)
 
         var request = URLRequest(url: descriptor.downloadURL)
-        request.timeoutInterval = 3_600
+        request.timeoutInterval = 7 * 24 * 3_600
         request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
         request.setValue("application/octet-stream", forHTTPHeaderField: "Accept")
 
@@ -191,58 +222,24 @@ final class OnDeviceModelService: ObservableObject {
             ".\(requestedDescriptor.filename).\(generation.uuidString).download",
             isDirectory: false
         )
-        let expectedByteCount = requestedDescriptor.expectedByteCount
-        let task = session.downloadTask(with: request) { [weak self] temporaryURL, response, error in
-            var failureMessage: String?
-
-            if let error {
-                failureMessage = error.localizedDescription
-            } else if let http = response as? HTTPURLResponse,
-                      !(200..<300).contains(http.statusCode) {
-                failureMessage = "내부 모델 다운로드가 HTTP \(http.statusCode)로 실패했습니다."
-            } else if let expected = response?.expectedContentLength,
-                      expected > 0,
-                      expected != expectedByteCount {
-                failureMessage = "모델 서버가 예상과 다른 크기의 파일을 반환했습니다."
-            } else if let temporaryURL {
-                do {
-                    if FileManager.default.fileExists(atPath: stagingURL.path) {
-                        try FileManager.default.removeItem(at: stagingURL)
-                    }
-                    try FileManager.default.moveItem(
-                        at: temporaryURL,
-                        to: stagingURL
-                    )
-                } catch {
-                    failureMessage = error.localizedDescription
-                }
-            } else {
-                failureMessage = "내부 모델 다운로드 파일을 찾지 못했습니다."
-            }
-
-            Task { @MainActor [weak self] in
-                await self?.finishDownload(
-                    stagingURL: stagingURL,
-                    failureMessage: failureMessage,
-                    generation: generation,
-                    descriptor: requestedDescriptor
-                )
-            }
+        let metadata = OnDeviceModelDownloadMetadata(
+            descriptorID: requestedDescriptor.id,
+            generation: generation,
+            stagingPath: stagingURL.path,
+            expectedByteCount: requestedDescriptor.expectedByteCount
+        )
+        let task: URLSessionDownloadTask
+        if let resumeData = try? Data(contentsOf: resumeDataURL) {
+            task = session.downloadTask(withResumeData: resumeData)
+            try? fileManager.removeItem(at: resumeDataURL)
+        } else {
+            task = session.downloadTask(with: request)
         }
 
+        task.taskDescription = Self.encodedMetadata(metadata)
+        task.countOfBytesClientExpectsToReceive = requestedDescriptor.expectedByteCount
+        task.priority = URLSessionTask.highPriority
         downloadTask = task
-        progressTask = Task { [weak self] in
-            while !Task.isCancelled {
-                guard let self, let task = self.downloadTask else {
-                    return
-                }
-                let progress = task.progress.fractionCompleted
-                self.installationState = .downloading(
-                    progress: max(0, min(1, progress))
-                )
-                try? await Task.sleep(for: .milliseconds(250))
-            }
-        }
         task.resume()
     }
 
@@ -250,8 +247,8 @@ final class OnDeviceModelService: ObservableObject {
         downloadGeneration = UUID()
         downloadTask?.cancel()
         downloadTask = nil
-        progressTask?.cancel()
-        progressTask = nil
+        removeResumeData()
+        removeStagingDownloads(for: descriptor)
         if fileManager.fileExists(atPath: modelURL.path) {
             installationState = .checking
             Task {
@@ -266,8 +263,8 @@ final class OnDeviceModelService: ObservableObject {
         downloadGeneration = UUID()
         downloadTask?.cancel()
         downloadTask = nil
-        progressTask?.cancel()
-        progressTask = nil
+        removeResumeData()
+        removeStagingDownloads(for: descriptor)
         await unloadEngines()
         idleUnloadTask?.cancel()
         do {
@@ -389,25 +386,17 @@ final class OnDeviceModelService: ObservableObject {
 
     private func finishDownload(
         stagingURL: URL,
-        failureMessage: String?,
         generation: UUID,
         descriptor requestedDescriptor: OnDeviceModelDescriptor
     ) async {
-        guard generation == downloadGeneration,
-              requestedDescriptor == descriptor else {
+        guard requestedDescriptor == descriptor else {
             try? fileManager.removeItem(at: stagingURL)
             return
         }
 
+        downloadGeneration = generation
         downloadTask = nil
-        progressTask?.cancel()
-        progressTask = nil
-
-        if let failureMessage {
-            try? fileManager.removeItem(at: stagingURL)
-            installationState = .failed(message: failureMessage)
-            return
-        }
+        removeResumeData()
 
         installationState = .verifying
         do {
@@ -428,7 +417,10 @@ final class OnDeviceModelService: ObservableObject {
                 try fileManager.moveItem(at: stagingURL, to: finalModelURL)
             }
             try fileManager.setAttributes(
-                [.protectionKey: FileProtectionType.complete],
+                [
+                    .protectionKey:
+                        FileProtectionType.completeUntilFirstUserAuthentication,
+                ],
                 ofItemAtPath: finalModelURL.path
             )
             var values = URLResourceValues()
@@ -490,6 +482,13 @@ final class OnDeviceModelService: ObservableObject {
             at: modelDirectory,
             withIntermediateDirectories: true
         )
+        try fileManager.setAttributes(
+            [
+                .protectionKey:
+                    FileProtectionType.completeUntilFirstUserAuthentication,
+            ],
+            ofItemAtPath: modelDirectory.path
+        )
         var values = URLResourceValues()
         values.isExcludedFromBackup = true
         var directory = modelDirectory
@@ -511,6 +510,233 @@ final class OnDeviceModelService: ObservableObject {
             descriptor.filename,
             isDirectory: false
         )
+    }
+
+    private var resumeDataURL: URL {
+        modelDirectory.appendingPathComponent(
+            ".\(descriptor.filename).resume-data",
+            isDirectory: false
+        )
+    }
+
+    private func reconnectBackgroundDownload() {
+        session.getAllTasks { [weak self] tasks in
+            Task { @MainActor [weak self] in
+                guard let self else {
+                    return
+                }
+
+                var selectedTask: URLSessionDownloadTask?
+                for task in tasks {
+                    guard let task = task as? URLSessionDownloadTask,
+                          let metadata = Self.decodedMetadata(
+                              from: task.taskDescription
+                          ) else {
+                        task.cancel()
+                        continue
+                    }
+                    guard metadata.descriptorID == self.descriptor.id else {
+                        task.cancel()
+                        continue
+                    }
+                    if let existing = selectedTask {
+                        if existing.taskIdentifier < task.taskIdentifier {
+                            existing.cancel()
+                            selectedTask = task
+                        } else {
+                            task.cancel()
+                        }
+                    } else {
+                        selectedTask = task
+                    }
+                }
+
+                if let selectedTask,
+                   let metadata = Self.decodedMetadata(
+                       from: selectedTask.taskDescription
+                   ) {
+                    self.downloadGeneration = metadata.generation
+                    self.downloadTask = selectedTask
+                    self.installationState = .downloading(
+                        progress: Self.normalizedProgress(selectedTask.progress)
+                    )
+                    selectedTask.resume()
+                } else {
+                    await self.recoverStagedDownloadOrRefresh()
+                }
+            }
+        }
+    }
+
+    private func recoverStagedDownloadOrRefresh() async {
+        let prefix = ".\(descriptor.filename)."
+        let suffix = ".download"
+        let candidates = (
+            try? fileManager.contentsOfDirectory(
+                at: modelDirectory,
+                includingPropertiesForKeys: [.contentModificationDateKey],
+                options: []
+            )
+        ) ?? []
+        let stagedDownloads = candidates
+            .filter {
+                $0.lastPathComponent.hasPrefix(prefix)
+                    && $0.lastPathComponent.hasSuffix(suffix)
+            }
+            .sorted {
+                let left = try? $0.resourceValues(
+                    forKeys: [.contentModificationDateKey]
+                ).contentModificationDate
+                let right = try? $1.resourceValues(
+                    forKeys: [.contentModificationDateKey]
+                ).contentModificationDate
+                return (left ?? .distantPast) > (right ?? .distantPast)
+            }
+
+        if let stagedURL = stagedDownloads.first,
+           let generation = Self.generation(
+               fromStagingFilename: stagedURL.lastPathComponent,
+               descriptor: descriptor
+           ) {
+            for obsolete in stagedDownloads.dropFirst() {
+                try? fileManager.removeItem(at: obsolete)
+            }
+            await finishDownload(
+                stagingURL: stagedURL,
+                generation: generation,
+                descriptor: descriptor
+            )
+            return
+        }
+
+        await refreshInstallation()
+    }
+
+    private func handleDownloadFailure(
+        error: Error,
+        metadata: OnDeviceModelDownloadMetadata?
+    ) {
+        guard metadata?.descriptorID == descriptor.id else {
+            return
+        }
+        downloadTask = nil
+
+        let nsError = error as NSError
+        if nsError.code == NSURLErrorCancelled {
+            return
+        }
+        if let resumeData = nsError.userInfo[
+            NSURLSessionDownloadTaskResumeData
+        ] as? Data {
+            do {
+                try prepareModelDirectory()
+                try resumeData.write(to: resumeDataURL, options: .atomic)
+                installationState = .failed(
+                    message: "다운로드가 일시 중단됐습니다. 다시 시도하면 이어받습니다."
+                )
+                return
+            } catch {
+                try? fileManager.removeItem(at: resumeDataURL)
+            }
+        }
+        installationState = .failed(
+            message: "모델 다운로드 실패: \(error.localizedDescription)"
+        )
+    }
+
+    private func handleDownloadProgress(
+        taskIdentifier: Int,
+        metadata: OnDeviceModelDownloadMetadata?,
+        totalBytesWritten: Int64,
+        totalBytesExpected: Int64
+    ) {
+        guard metadata?.descriptorID == descriptor.id,
+              downloadTask?.taskIdentifier == taskIdentifier else {
+            return
+        }
+        let expected = totalBytesExpected > 0
+            ? totalBytesExpected
+            : descriptor.expectedByteCount
+        let progress = Double(totalBytesWritten) / Double(expected)
+        installationState = .downloading(
+            progress: max(0, min(1, progress))
+        )
+    }
+
+    private func removeResumeData() {
+        if fileManager.fileExists(atPath: resumeDataURL.path) {
+            try? fileManager.removeItem(at: resumeDataURL)
+        }
+    }
+
+    private func removeStagingDownloads(
+        for descriptor: OnDeviceModelDescriptor
+    ) {
+        let prefix = ".\(descriptor.filename)."
+        let candidates = (
+            try? fileManager.contentsOfDirectory(
+                at: modelDirectory,
+                includingPropertiesForKeys: nil
+            )
+        ) ?? []
+        for candidate in candidates
+        where candidate.lastPathComponent.hasPrefix(prefix)
+            && candidate.pathExtension == "download" {
+            try? fileManager.removeItem(at: candidate)
+        }
+    }
+
+    private nonisolated static func encodedMetadata(
+        _ metadata: OnDeviceModelDownloadMetadata
+    ) -> String? {
+        guard let data = try? JSONEncoder().encode(metadata) else {
+            return nil
+        }
+        return data.base64EncodedString()
+    }
+
+    private nonisolated static func decodedMetadata(
+        from taskDescription: String?
+    ) -> OnDeviceModelDownloadMetadata? {
+        guard let taskDescription,
+              let data = Data(base64Encoded: taskDescription) else {
+            return nil
+        }
+        return try? JSONDecoder().decode(
+            OnDeviceModelDownloadMetadata.self,
+            from: data
+        )
+    }
+
+    private nonisolated static func normalizedProgress(
+        _ progress: Progress
+    ) -> Double {
+        let fraction = progress.fractionCompleted
+        guard fraction.isFinite else {
+            return 0
+        }
+        return max(0, min(1, fraction))
+    }
+
+    private nonisolated static func generation(
+        fromStagingFilename filename: String,
+        descriptor: OnDeviceModelDescriptor
+    ) -> UUID? {
+        let prefix = ".\(descriptor.filename)."
+        let suffix = ".download"
+        guard filename.hasPrefix(prefix),
+              filename.hasSuffix(suffix) else {
+            return nil
+        }
+        let start = filename.index(
+            filename.startIndex,
+            offsetBy: prefix.count
+        )
+        let end = filename.index(
+            filename.endIndex,
+            offsetBy: -suffix.count
+        )
+        return UUID(uuidString: String(filename[start..<end]))
     }
 
     private func scheduleIdleUnload() {
@@ -550,6 +776,136 @@ final class OnDeviceModelService: ObservableObject {
             if fileManager.fileExists(atPath: legacyURL.path) {
                 try? fileManager.removeItem(at: legacyURL)
             }
+        }
+    }
+}
+
+extension OnDeviceModelService: URLSessionDownloadDelegate {
+    nonisolated func urlSession(
+        _ session: URLSession,
+        downloadTask: URLSessionDownloadTask,
+        didWriteData bytesWritten: Int64,
+        totalBytesWritten: Int64,
+        totalBytesExpectedToWrite: Int64
+    ) {
+        let metadata = Self.decodedMetadata(
+            from: downloadTask.taskDescription
+        )
+        Task { @MainActor [weak self] in
+            self?.handleDownloadProgress(
+                taskIdentifier: downloadTask.taskIdentifier,
+                metadata: metadata,
+                totalBytesWritten: totalBytesWritten,
+                totalBytesExpected: totalBytesExpectedToWrite
+            )
+        }
+    }
+
+    nonisolated func urlSession(
+        _ session: URLSession,
+        downloadTask: URLSessionDownloadTask,
+        didFinishDownloadingTo location: URL
+    ) {
+        guard let metadata = Self.decodedMetadata(
+            from: downloadTask.taskDescription
+        ) else {
+            return
+        }
+
+        var failure: Error?
+        if let response = downloadTask.response as? HTTPURLResponse,
+           !(200..<300).contains(response.statusCode) {
+            failure = OnDeviceModelDownloadError.http(response.statusCode)
+        } else if let expected = downloadTask.response?.expectedContentLength,
+                  expected > 0,
+                  expected != metadata.expectedByteCount {
+            failure = OnDeviceModelDownloadError.unexpectedFileSize
+        } else {
+            do {
+                let stagingURL = URL(fileURLWithPath: metadata.stagingPath)
+                let manager = FileManager.default
+                if manager.fileExists(atPath: stagingURL.path) {
+                    try manager.removeItem(at: stagingURL)
+                }
+                try manager.moveItem(at: location, to: stagingURL)
+                try manager.setAttributes(
+                    [
+                        .protectionKey:
+                            FileProtectionType
+                                .completeUntilFirstUserAuthentication,
+                    ],
+                    ofItemAtPath: stagingURL.path
+                )
+            } catch {
+                failure = error
+            }
+        }
+
+        if let failure {
+            Task { @MainActor [weak self] in
+                self?.handleDownloadFailure(
+                    error: failure,
+                    metadata: metadata
+                )
+            }
+            return
+        }
+
+        let stagingURL = URL(fileURLWithPath: metadata.stagingPath)
+        Task { @MainActor [weak self] in
+            guard let self,
+                  let requestedDescriptor = self.availableModels.first(
+                      where: { $0.id == metadata.descriptorID }
+                  ) else {
+                try? FileManager.default.removeItem(at: stagingURL)
+                return
+            }
+            await self.finishDownload(
+                stagingURL: stagingURL,
+                generation: metadata.generation,
+                descriptor: requestedDescriptor
+            )
+        }
+    }
+
+    nonisolated func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didCompleteWithError error: Error?
+    ) {
+        guard let error else {
+            return
+        }
+        let metadata = Self.decodedMetadata(from: task.taskDescription)
+        Task { @MainActor [weak self] in
+            self?.handleDownloadFailure(
+                error: error,
+                metadata: metadata
+            )
+        }
+    }
+
+    nonisolated func urlSessionDidFinishEvents(
+        forBackgroundURLSession session: URLSession
+    ) {
+        Task { @MainActor in
+            RelayCodeBackgroundSessionEvents.shared.finish(
+                identifier: session.configuration.identifier
+            )
+        }
+    }
+}
+
+private enum OnDeviceModelDownloadError: LocalizedError {
+    case http(Int)
+    case unexpectedFileSize
+
+    var errorDescription: String? {
+        switch self {
+        case let .http(statusCode):
+            "내부 모델 다운로드가 HTTP \(statusCode)로 실패했습니다."
+        case .unexpectedFileSize:
+            "모델 서버가 예상과 다른 크기의 파일을 반환했습니다."
         }
     }
 }

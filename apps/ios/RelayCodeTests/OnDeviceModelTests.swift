@@ -209,3 +209,35 @@ func artifactVerifierRejectsWrongFileSizeBeforeHashing() throws {
         )
     }
 }
+
+@Test
+func artifactVerifierHashesAcrossMultipleBoundedReadChunks() throws {
+    let temporaryURL = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString)
+    let artifact = Data(repeating: 0xA5, count: 2_200_000)
+    try artifact.write(to: temporaryURL)
+    defer {
+        try? FileManager.default.removeItem(at: temporaryURL)
+    }
+
+    let descriptor = OnDeviceModelDescriptor(
+        id: "bounded-hash-fixture",
+        displayName: "Bounded hash fixture",
+        filename: "bounded-hash-fixture.bin",
+        downloadURL: URL(string: "https://example.invalid/model")!,
+        expectedByteCount: 2_200_000,
+        expectedSHA256:
+            "4fbfa3e8228fdaba7fa345c8df9009a9e5c4751534542e6e938e821210b7f789",
+        contextLength: 2_048,
+        maximumOutputTokens: 256,
+        minimumRecommendedMemoryBytes: 1,
+        runtime: .llamaCPP,
+        promptProfile: .compact,
+        quantizationName: "fixture"
+    )
+
+    try OnDeviceModelArtifactVerifier.verify(
+        fileURL: temporaryURL,
+        descriptor: descriptor
+    )
+}
