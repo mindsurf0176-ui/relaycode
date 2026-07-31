@@ -8,18 +8,37 @@ function normalizePublicUrl(config: RelayConfig): string {
     || `http://${config.host === "0.0.0.0" ? "127.0.0.1" : config.host}:${config.port}`;
 }
 
+function bridgeUrl(config: RelayConfig): string {
+  const publicUrl = normalizePublicUrl(config).replace(/\/+$/, "");
+  return process.env.RELAYCODE_BRIDGE_URL?.trim()
+    || publicUrl.replace(/^http/, "ws") + "/ws";
+}
+
 export function pairUrl(config: RelayConfig, token: string): string {
   const publicUrl = normalizePublicUrl(config).replace(/\/+$/, "");
-  const bridgeUrl = process.env.RELAYCODE_BRIDGE_URL?.trim()
-    || publicUrl.replace(/^http/, "ws") + "/ws";
-  const fragment = new URLSearchParams({ pair: token, bridge: bridgeUrl });
+  const fragment = new URLSearchParams({
+    pair: token,
+    bridge: bridgeUrl(config),
+  });
   return `${publicUrl}/#${fragment.toString()}`;
 }
 
+export function nativePairUrl(config: RelayConfig, token: string): string {
+  const query = new URLSearchParams({
+    pair: token,
+    bridge: bridgeUrl(config),
+  });
+  return `relaycode://pair?${query.toString()}`;
+}
+
 export function printPairing(config: RelayConfig, token: string): void {
-  const url = pairUrl(config, token);
-  console.log("\nPair this phone once. Treat this URL like an SSH key:\n");
-  console.log(url);
+  const nativeUrl = nativePairUrl(config, token);
+  const webUrl = pairUrl(config, token);
+  console.log("\nScan once to open RelayCode and pair this iPhone:\n");
+  console.log(nativeUrl);
   console.log();
-  qrcode.generate(url, { small: true });
+  qrcode.generate(nativeUrl, { small: true });
+  console.log("\nBrowser/PWA fallback:\n");
+  console.log(webUrl);
+  console.log("\nTreat both links like an SSH key.");
 }

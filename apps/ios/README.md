@@ -28,8 +28,9 @@ iPhone or iPad. On the Mac, create the paste-ready pairing link:
 RELAYCODE_PUBLIC_URL=https://your-mac.your-tailnet.ts.net npm run pair
 ```
 
-Paste the complete link into the app. `relaycode://pair?pair=…&bridge=…` is also
-accepted when opened by iOS.
+The CLI prints a `relaycode://pair` QR first. Scan it with the iPhone camera to
+open RelayCode and save the pairing directly to device-only Keychain. The
+printed HTTPS link remains available for manual paste and Safari/PWA use.
 
 Local Xcode is optional for contributors. Every pull request runs
 `npm run ios:verify` and the complete unsigned `xcodebuild` on GitHub's macOS

@@ -40,8 +40,10 @@ relaycode setup --workspace ~/Projects
 ```
 
 `setup` checks Codex login, configures Tailscale Serve, registers the Homebrew
-background service, and prints a one-time QR code. Scan it on the phone, then use
-Safari's **Add to Home Screen** action for an app-like experience.
+background service, and prints a one-time QR code. With the native iOS app
+installed, scanning the QR opens RelayCode and saves the pairing directly to
+device-only Keychain. The printed HTTPS link remains available for Safari/PWA
+use, including **Add to Home Screen**.
 
 Add another allowed root by repeating the option:
 
