@@ -24,13 +24,24 @@ an SSH key.
 - Native web navigation is limited to the configured RelayCode origin.
 - Rotating pairing credentials invalidates an existing client on its next
   protocol message.
-- Mobile RPC is allowlisted. Destructive thread deletion, config writes,
-  arbitrary process spawning, and shell-command RPC are not exposed.
+- Mobile RPC is allowlisted. Destructive thread deletion, config writes, and
+  arbitrary process selection are not exposed. RelayCode 0.2 adds a direct
+  terminal RPC that can start only the fixed sandboxed shell described below.
 - Only command approvals, file approvals, and explicit agent questions are
   forwarded to the phone. Other app-server callbacks fail closed.
 - New and resumed threads force `workspace-write`, `on-request` approval, and
   `user` as the approval reviewer.
 - Workspace paths must resolve inside configured roots.
+- Remote file access rejects traversal and symlink escape, caps text files at
+  512 KB, hides likely credential filenames, and requires the previously read
+  SHA-256 hash before replacing an existing file.
+- Git status and diff run without global/system Git configuration, external
+  diffs, text conversion, optional locks, or network operations.
+- Direct terminal sessions use `/usr/bin/sandbox-exec`, a fresh temporary
+  `HOME`, `zsh -f`, and a sanitized environment. Writes are limited to the
+  selected workspace and temporary home. Network access is denied unless the
+  phone explicitly enables it for that session. Output replay is capped and
+  sessions end when the bridge restarts.
 - Existing thread lists are filtered by those roots. Read, resume, rename,
   steer, interrupt, approval, and notification paths are rechecked against the
   same boundary before they reach a phone.
@@ -61,6 +72,13 @@ Only the latest tagged release is supported during the public alpha.
 - Android Keystore support is not implemented.
 - The first adapter is Codex. Additional provider adapters must preserve the same
   approval and workspace boundary instead of forwarding provider APIs blindly.
+- A paired client that starts a direct terminal can read source and credentials
+  stored inside the selected workspace and can modify that workspace without a
+  separate Codex approval object. Use narrow roots, keep secrets outside source
+  trees, and rotate the pairing token after a lost or shared device.
+- The direct terminal is a pipe-backed shell rather than a PTY. Interactive
+  full-screen tools, job control, and terminal resize negotiation are not
+  supported.
 - Direct on-premises prompts leave the device and are processed by the endpoint
   selected by the user. RelayCode does not currently redact prompt contents.
 - The Linux runtime is experimental and intentionally lacks persistent storage,

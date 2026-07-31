@@ -19,6 +19,10 @@ keeping execution inside a private host.
 - Execution: the paired Mac or Linux host.
 - Strengths: full repositories, toolchains, long-running tests, containers, and
   the existing RelayCode approval boundary.
+- The paired Mac implementation includes direct file browse/search/edit,
+  optimistic conflict detection, read-only Git status/diff, and reconnectable
+  sandboxed shell streams. Direct terminal commands are separate from the Codex
+  approval flow and therefore require the same trust as an SSH-capable device.
 - This remains the dependable path for production development.
 
 ### On-premises AI

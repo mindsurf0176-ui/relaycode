@@ -10,17 +10,22 @@ import {
   allowedAgentMethods,
   mobileServerRequestMethods,
   parseClientMessage,
+  workspaceMethods,
   type AllowedAgentMethod,
   type BridgeStatus,
   type ServerMessage,
+  type WorkspaceMethod,
 } from "@relaycode/protocol";
 import { WebSocket, WebSocketServer } from "ws";
 import { canonicalRoots, currentTokenHash, type RelayConfig } from "./config.js";
 import { CodexAppServer } from "./codex-app-server.js";
 import { assertWorkspacePath, sanitizeAgentParams, tokenFromProtocols, tokenMatches } from "./security.js";
+import { TerminalManager, terminalCapability } from "./terminal.js";
+import { WorkspaceService } from "./workspace.js";
 
-const bridgeVersion = "0.1.1";
+const bridgeVersion = "0.2.0";
 const allowedMethods = new Set<string>(allowedAgentMethods);
+const allowedWorkspaceMethods = new Set<string>(workspaceMethods);
 const allowedServerRequests = new Set<string>(mobileServerRequestMethods);
 const threadScopedMethods = new Set<string>([
   "thread/read",
@@ -91,6 +96,8 @@ export class RelayServer {
   private readonly roots: string[];
   private readonly authorizedThreads = new Set<string>();
   private readonly codex = new CodexAppServer();
+  private readonly workspace: WorkspaceService;
+  private readonly terminals: TerminalManager;
   private readonly clients = new Set<WebSocket>();
   private readonly server = createServer((request, response) => this.handleHttp(request, response));
   private readonly wss = new WebSocketServer({
@@ -100,6 +107,8 @@ export class RelayServer {
 
   constructor(private readonly config: RelayConfig) {
     this.roots = canonicalRoots(config);
+    this.workspace = new WorkspaceService(this.roots);
+    this.terminals = new TerminalManager(this.roots);
     this.server.on("upgrade", (request, socket, head) => {
       const path = new URL(request.url || "/", "http://localhost").pathname;
       const token = tokenFromProtocols(request.headers["sec-websocket-protocol"]);
@@ -151,6 +160,20 @@ export class RelayServer {
     this.codex.on("warning", (message: string) => {
       this.broadcast({ type: "notification", method: "relay/warning", params: { message } });
     });
+    this.terminals.on("output", (params: unknown) => {
+      this.broadcast({
+        type: "notification",
+        method: "terminal/output",
+        params,
+      });
+    });
+    this.terminals.on("exit", (params: unknown) => {
+      this.broadcast({
+        type: "notification",
+        method: "terminal/exited",
+        params,
+      });
+    });
   }
 
   async listen(): Promise<void> {
@@ -165,6 +188,7 @@ export class RelayServer {
 
   close(): void {
     for (const client of this.clients) client.close(1001, "Bridge shutting down");
+    this.terminals.close();
     this.codex.stop();
     this.server.close();
   }
@@ -182,6 +206,11 @@ export class RelayServer {
         error: this.codex.lastError,
       },
       workspaceRoots: this.config.workspaceRoots,
+      capabilities: {
+        workspaceFiles: true,
+        git: true,
+        terminal: terminalCapability(),
+      },
     };
   }
 
@@ -253,6 +282,16 @@ export class RelayServer {
             path,
             name: path.split(sep).filter(Boolean).at(-1) || path,
           }));
+        } else if (allowedWorkspaceMethods.has(message.method)) {
+          const method = message.method as WorkspaceMethod;
+          if (method.startsWith("terminal/")) {
+            result = await this.terminals.request(
+              method as Extract<WorkspaceMethod, `terminal/${string}`>,
+              message.params,
+            );
+          } else {
+            result = await this.workspace.request(method, message.params);
+          }
         } else if (allowedMethods.has(message.method)) {
           const method = message.method as AllowedAgentMethod;
           const params = sanitizeAgentParams(method, message.params, this.config, this.roots);

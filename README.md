@@ -86,6 +86,13 @@ Do not use Tailscale Funnel, public router forwarding, or a bridge bound to
 - Review turn diffs and interrupt active work.
 - Inspect account usage and rate-limit windows.
 - Switch between explicitly configured workspace roots.
+- Browse and search remote source files, edit text files up to 512 KB, and save
+  with an optimistic conflict check instead of silently overwriting Mac changes.
+- Inspect branch state and read worktree or staged Git diffs without exposing
+  commit, pull, or push as direct mobile RPC calls.
+- Reconnect to persistent macOS sandbox terminals with a sanitized environment,
+  bounded replay, workspace-scoped writes, and network access disabled by
+  default.
 - Register and verify private OpenAI-compatible model endpoints from the native
   iOS app without exposing credentials to the web client.
 - Run real chat completions against the selected on-premises model from a
@@ -99,6 +106,10 @@ Do not use Tailscale Funnel, public router forwarding, or a bridge bound to
 
 RelayCode is an operations console rather than a clone of an existing chat app:
 active work, blocked approvals, results, and diffs take priority over prose.
+
+The remote file, Git, and terminal boundary is documented in
+[docs/REMOTE_STUDIO.md](docs/REMOTE_STUDIO.md). The terminal is a bounded shell
+stream, not a full PTY; full-screen TUI programs are not supported.
 
 The Linux guest uses 64 MB on constrained devices or 128 MB on higher-memory
 iPhones, an ephemeral in-memory filesystem, and no guest network or host-folder
@@ -125,6 +136,11 @@ instructions.
   human review.
 - Workspace paths and existing thread paths are checked before reaching the
   phone.
+- Remote file traversal and symlink escape fail closed. Likely credential files
+  are hidden from the file API.
+- The direct terminal starts only through the macOS sandbox, receives no bridge
+  secrets or user shell profile, and writes only inside the selected workspace
+  and its private temporary home.
 - Unsupported app-server callbacks fail closed.
 
 Treat a paired phone like an SSH key. See [SECURITY.md](SECURITY.md) for the full

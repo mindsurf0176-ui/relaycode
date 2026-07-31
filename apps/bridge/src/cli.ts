@@ -13,7 +13,7 @@ import {
 import { printPairing } from "./pair.js";
 import { RelayServer } from "./server.js";
 
-export const relayCodeVersion = "0.1.1";
+export const relayCodeVersion = "0.2.0";
 
 export type CliOptions = {
   command: "help" | "version" | "setup" | "serve" | "pair" | "status" | "doctor";

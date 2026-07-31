@@ -45,9 +45,11 @@ Native iOS/Android shell, Keychain/Keystore, push notifications, multi-device
 revocation, encrypted relay, reconnect replay, and background host health.
 
 Current progress: the native iOS/iPadOS shell, device-only Keychain storage,
-same-origin web containment, foreground reconnect, and host health feedback are
-implemented. Android, push notifications, multi-device revocation, encrypted
-relay service, and durable reconnect replay remain.
+same-origin web containment, foreground reconnect, host health feedback, direct
+remote file browse/search/edit, read-only Git status/diff, and reconnectable
+macOS sandbox terminals are implemented. Terminal replay survives client
+reconnects but not a bridge restart. Android, push notifications, multi-device
+revocation, an encrypted relay service, and durable restart replay remain.
 
 ### Distribution — public alpha
 
@@ -76,6 +78,10 @@ Keychain credentials, and real Chat Completions inference are implemented.
 Add a SwiftUI project browser, editor, search, Git status/diff, and explicit
 write operations for app-container and user-selected Files workspaces. Keep the
 paired remote console as one workspace type rather than the entire native app.
+
+Current remote delivery: the paired Mac workspace already exposes these
+file/search/Git views through the shared mobile UI. Slice 6 still refers to
+files stored locally in the iOS app container or selected through Files.
 
 ### Slice 7 — on-device inference
 
