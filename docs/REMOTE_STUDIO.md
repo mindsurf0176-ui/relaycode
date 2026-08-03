@@ -36,7 +36,11 @@ The current terminal is available on a macOS bridge with `sandbox-exec`.
 
 - Up to four running sessions are kept by the bridge.
 - A phone reconnect receives the last 256 KB of output.
-- Sessions expire one hour after exit and all sessions end on bridge restart.
+- A running session closes after eight hours without input or output, and an
+  exited session is discarded one hour later.
+- A normal bridge shutdown ends every session. If the bridge is killed instead,
+  a command that is still running can outlive it; the temporary home it used is
+  removed the next time the bridge starts.
 - RelayCode starts `zsh -f` with a new temporary `HOME`; user profiles and
   bridge environment secrets are not inherited.
 - Reads use system toolchain paths and the selected workspace. Writes are

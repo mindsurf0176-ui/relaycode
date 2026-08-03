@@ -66,15 +66,25 @@ const mimeTypes: Record<string, string> = {
   ".webmanifest": "application/manifest+json",
 };
 
+const codexVersionCacheMilliseconds = 60_000;
+let codexVersionCache: { value: string | undefined; readAt: number } | null = null;
+
 function codexVersion(): string | undefined {
+  const now = Date.now();
+  if (codexVersionCache && now - codexVersionCache.readAt < codexVersionCacheMilliseconds) {
+    return codexVersionCache.value;
+  }
+  let value: string | undefined;
   try {
-    return execFileSync(process.env.CODEX_BIN || "codex", ["--version"], {
+    value = execFileSync(process.env.CODEX_BIN || "codex", ["--version"], {
       encoding: "utf8",
       timeout: 5_000,
     }).trim();
   } catch {
-    return undefined;
+    value = undefined;
   }
+  codexVersionCache = { value, readAt: now };
+  return value;
 }
 
 function webRoot(): string {
@@ -85,8 +95,15 @@ function webRoot(): string {
   return existsSync(developmentRoot) ? developmentRoot : releaseRoot;
 }
 
-function safeWebPath(root: string, requestPath: string): string | null {
-  const decoded = decodeURIComponent(requestPath.split("?")[0] || "/");
+export function safeWebPath(root: string, requestPath: string): string | null {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(requestPath.split("?")[0] || "/");
+  } catch {
+    // A malformed percent escape is a bad request, never a crash.
+    return null;
+  }
+  if (decoded.includes("\0")) return null;
   const relativePath = decoded === "/" ? "index.html" : decoded.replace(/^\/+/, "");
   const target = resolve(root, relativePath);
   return target === root || target.startsWith(`${root}${sep}`) ? target : null;
@@ -317,6 +334,23 @@ export class RelayServer {
   }
 
   private handleHttp(request: IncomingMessage, response: ServerResponse): void {
+    try {
+      this.serveHttp(request, response);
+    } catch (error) {
+      // A single malformed request must never take the bridge down.
+      debug("http request failed", {
+        message: error instanceof Error ? error.message : String(error),
+      });
+      if (response.headersSent) {
+        response.destroy();
+        return;
+      }
+      response.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "RelayCode could not serve this request." }));
+    }
+  }
+
+  private serveHttp(request: IncomingMessage, response: ServerResponse): void {
     if (request.url === "/healthz") {
       response.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
       response.end(JSON.stringify({ ok: true, agent: this.codex.state }));
@@ -328,8 +362,13 @@ export class RelayServer {
     }
     const root = webRoot();
     const path = safeWebPath(root, request.url || "/");
+    if (path === null) {
+      response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "Invalid request path." }));
+      return;
+    }
     const fallback = resolve(root, "index.html");
-    const target = path && existsSync(path) && statSync(path).isFile() ? path : fallback;
+    const target = existsSync(path) && statSync(path).isFile() ? path : fallback;
     if (!existsSync(target)) {
       response.writeHead(503, { "Content-Type": "application/json; charset=utf-8" });
       response.end(JSON.stringify({

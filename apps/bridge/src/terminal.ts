@@ -3,8 +3,10 @@ import { EventEmitter } from "node:events";
 import {
   existsSync,
   mkdtempSync,
+  readdirSync,
   realpathSync,
   rmSync,
+  statSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
@@ -36,6 +38,33 @@ const maxInputBytes = 16 * 1024;
 const maxReplayBytes = 256 * 1024;
 const maxChunkBytes = 32 * 1024;
 const expiredSessionMilliseconds = 60 * 60 * 1_000;
+const idleSessionMilliseconds = 8 * 60 * 60 * 1_000;
+const staleHomeMilliseconds = 24 * 60 * 60 * 1_000;
+const pruneIntervalMilliseconds = 5 * 60 * 1_000;
+const temporaryHomePrefix = "relaycode-terminal-";
+
+export function removeStaleTerminalHomes(now = Date.now()): number {
+  let names: string[];
+  try {
+    names = readdirSync(tmpdir());
+  } catch {
+    return 0;
+  }
+  let removed = 0;
+  for (const name of names) {
+    if (!name.startsWith(temporaryHomePrefix)) continue;
+    const path = join(tmpdir(), name);
+    try {
+      // A directory another bridge still uses keeps a recent modification time.
+      if (now - statSync(path).mtimeMs < staleHomeMilliseconds) continue;
+      rmSync(path, { recursive: true, force: true });
+      removed += 1;
+    } catch {
+      // A directory owned by another user or already gone is skipped.
+    }
+  }
+  return removed;
+}
 
 function params(value: unknown): Params {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -134,9 +163,14 @@ export function terminalCapability(): {
 
 export class TerminalManager extends EventEmitter {
   private readonly sessions = new Map<string, TerminalSession>();
+  private readonly pruneTimer: NodeJS.Timeout;
 
   constructor(private readonly roots: string[]) {
     super();
+    removeStaleTerminalHomes();
+    // Idle sessions must expire even while the phone sends no requests.
+    this.pruneTimer = setInterval(() => this.prune(), pruneIntervalMilliseconds);
+    this.pruneTimer.unref();
   }
 
   async request(method: TerminalMethod, value: unknown): Promise<unknown> {
@@ -164,6 +198,7 @@ export class TerminalManager extends EventEmitter {
   }
 
   close(): void {
+    clearInterval(this.pruneTimer);
     for (const session of this.sessions.values()) {
       this.terminate(session, "SIGTERM");
     }
@@ -368,9 +403,24 @@ export class TerminalManager extends EventEmitter {
   }
 
   private prune(): void {
-    const threshold = Date.now() - expiredSessionMilliseconds;
+    const now = Date.now();
     for (const [id, session] of this.sessions) {
-      if (session.state === "exited" && session.lastActiveAt < threshold) {
+      if (
+        session.state === "running"
+        && now - session.lastActiveAt >= idleSessionMilliseconds
+      ) {
+        this.append(
+          session,
+          "system",
+          "\nRelayCode closed this session after 8 hours without activity.\n",
+        );
+        this.terminate(session, "SIGTERM");
+        continue;
+      }
+      if (
+        session.state === "exited"
+        && session.lastActiveAt < now - expiredSessionMilliseconds
+      ) {
         this.sessions.delete(id);
         this.removeTemporaryHome(session);
       }
