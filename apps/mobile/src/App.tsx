@@ -7,8 +7,9 @@ import {
   savePairing,
   type ConnectionState,
 } from "./bridge";
+import { WorkspaceScreen } from "./WorkspaceScreen";
 
-type View = "home" | "start" | "usage" | "settings" | "thread";
+type View = "home" | "start" | "workspace" | "usage" | "settings" | "thread";
 type UnknownRecord = Record<string, unknown>;
 type Workspace = { path: string; name: string };
 type Model = {
@@ -599,6 +600,8 @@ function SettingsScreen({ status, onForget }: { status?: BridgeStatus; onForget:
         <article><span>Bridge</span><strong className="mono">{config.bridge}</strong></article>
         <article><span>Workspace roots</span><strong>{status?.workspaceRoots.length || 0}개</strong></article>
         <article><span>Protocol</span><strong>v{status?.protocolVersion || 1}</strong></article>
+        <article><span>Remote files</span><strong>{status?.capabilities?.workspaceFiles ? "사용 가능" : "확인 필요"}</strong></article>
+        <article><span>Sandbox terminal</span><strong>{status?.capabilities?.terminal.available ? "사용 가능" : "사용 불가"}</strong></article>
       </div>
       <div className="security-card">
         <span>⌁</span>
@@ -792,6 +795,7 @@ export function App() {
   const navigation = useMemo(() => [
     { id: "home" as const, label: "작업", icon: "⌁" },
     { id: "start" as const, label: "시작", icon: "+" },
+    { id: "workspace" as const, label: "코드", icon: "⌘" },
     { id: "usage" as const, label: "용량", icon: "◔" },
     { id: "settings" as const, label: "연결", icon: "⋯" },
   ], []);
@@ -812,6 +816,7 @@ export function App() {
       {error && <button className="error-banner" onClick={() => setError("")}>{error}<span>×</span></button>}
       {view === "home" && <HomeScreen threads={threads} approvals={approvals} loading={loading} onOpen={openThread} onStart={() => setView("start")} />}
       {view === "start" && <StartScreen workspaces={workspaces} models={models} busy={busy} onSubmit={startTask} />}
+      {view === "workspace" && <WorkspaceScreen workspaces={workspaces} onError={setError} />}
       {view === "usage" && <UsageScreen account={account} limits={limits} usage={usage} />}
       {view === "settings" && <SettingsScreen status={status} onForget={forget} />}
       {view === "thread" && <ThreadScreen thread={currentThread} items={items} diff={diff} activeTurn={activeTurn} onSend={sendToThread} onInterrupt={interrupt} onBack={() => setView("home")} />}

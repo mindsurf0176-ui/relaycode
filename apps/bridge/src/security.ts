@@ -22,7 +22,7 @@ export function tokenMatches(token: string | null, expectedHash: string): boolea
   return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
-function isWithin(path: string, root: string): boolean {
+export function isPathWithin(path: string, root: string): boolean {
   const rel = relative(root, path);
   return rel === "" || (!rel.startsWith("..") && !rel.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`));
 }
@@ -34,7 +34,7 @@ export function assertWorkspacePath(path: unknown, roots: string[]): string {
     throw new Error("Workspace path does not exist or is not a directory.");
   }
   const canonical = realpathSync(absolute);
-  if (!roots.some((root) => isWithin(canonical, root))) {
+  if (!roots.some((root) => isPathWithin(canonical, root))) {
     throw new Error("Workspace path is outside the configured RelayCode roots.");
   }
   return canonical;

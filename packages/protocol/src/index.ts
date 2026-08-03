@@ -22,6 +22,20 @@ export const relayMethods = [
   "relay/workspaces",
 ] as const;
 
+export const workspaceMethods = [
+  "workspace/entries",
+  "workspace/file/read",
+  "workspace/file/write",
+  "workspace/search",
+  "workspace/git/status",
+  "workspace/git/diff",
+  "terminal/session/list",
+  "terminal/session/start",
+  "terminal/session/write",
+  "terminal/session/interrupt",
+  "terminal/session/close",
+] as const;
+
 export const mobileServerRequestMethods = [
   "item/commandExecution/requestApproval",
   "item/fileChange/requestApproval",
@@ -32,7 +46,8 @@ export const mobileServerRequestMethods = [
 
 export type AllowedAgentMethod = (typeof allowedAgentMethods)[number];
 export type RelayMethod = (typeof relayMethods)[number];
-export type AllowedMethod = AllowedAgentMethod | RelayMethod;
+export type WorkspaceMethod = (typeof workspaceMethods)[number];
+export type AllowedMethod = AllowedAgentMethod | RelayMethod | WorkspaceMethod;
 export type MobileServerRequestMethod = (typeof mobileServerRequestMethods)[number];
 
 export type ClientRpcMessage = {
@@ -65,6 +80,14 @@ export type BridgeStatus = {
     error?: string;
   };
   workspaceRoots: string[];
+  capabilities?: {
+    workspaceFiles: boolean;
+    git: boolean;
+    terminal: {
+      available: boolean;
+      reason?: string;
+    };
+  };
 };
 
 export type ServerMessage =
@@ -75,7 +98,11 @@ export type ServerMessage =
   | { type: "pong"; sentAt: number; receivedAt: number }
   | { type: "status"; status: BridgeStatus };
 
-const allowed = new Set<string>([...allowedAgentMethods, ...relayMethods]);
+const allowed = new Set<string>([
+  ...allowedAgentMethods,
+  ...relayMethods,
+  ...workspaceMethods,
+]);
 
 export function isAllowedMethod(value: unknown): value is AllowedMethod {
   return typeof value === "string" && allowed.has(value);

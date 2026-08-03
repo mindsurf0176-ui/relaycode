@@ -39,4 +39,33 @@ final class PairingConfigurationTests: XCTestCase {
 
         XCTAssertThrowsError(try PairingConfiguration(token: token, bridgeURL: bridge))
     }
+
+    func testDecodedPairingRevalidatesBridgeAndDerivesWebURL() throws {
+        let token = String(repeating: "e", count: 43)
+        let validData = try XCTUnwrap(
+            """
+            {
+              "token": "\(token)",
+              "bridgeURL": "wss://mac.example.ts.net/ws",
+              "webURL": "https://attacker.example/"
+            }
+            """.data(using: .utf8)
+        )
+
+        let pairing = try JSONDecoder().decode(PairingConfiguration.self, from: validData)
+
+        XCTAssertEqual(pairing.webURL.absoluteString, "https://mac.example.ts.net/")
+
+        let insecureData = try XCTUnwrap(
+            """
+            {
+              "token": "\(token)",
+              "bridgeURL": "ws://mac.example.ts.net/ws"
+            }
+            """.data(using: .utf8)
+        )
+        XCTAssertThrowsError(
+            try JSONDecoder().decode(PairingConfiguration.self, from: insecureData)
+        )
+    }
 }

@@ -40,8 +40,10 @@ relaycode setup --workspace ~/Projects
 ```
 
 `setup` checks Codex login, configures Tailscale Serve, registers the Homebrew
-background service, and prints a one-time QR code. Scan it on the phone, then use
-Safari's **Add to Home Screen** action for an app-like experience.
+background service, and prints a one-time QR code. With the native iOS app
+installed, scanning the QR opens RelayCode and saves the pairing directly to
+device-only Keychain. The printed HTTPS link remains available for Safari/PWA
+use, including **Add to Home Screen**.
 
 Add another allowed root by repeating the option:
 
@@ -86,18 +88,46 @@ Do not use Tailscale Funnel, public router forwarding, or a bridge bound to
 - Review turn diffs and interrupt active work.
 - Inspect account usage and rate-limit windows.
 - Switch between explicitly configured workspace roots.
+- Browse and search remote source files, edit text files up to 512 KB, and save
+  with an optimistic conflict check instead of silently overwriting Mac changes.
+- Inspect branch state and read worktree or staged Git diffs without exposing
+  commit, pull, or push as direct mobile RPC calls.
+- Reconnect to persistent macOS sandbox terminals with a sanitized environment,
+  bounded replay, workspace-scoped writes, and network access disabled by
+  default.
+- Register and verify private OpenAI-compatible model endpoints from the native
+  iOS app without exposing credentials to the web client.
+- Run real chat completions against the selected on-premises model from a
+  native conversation surface.
+- Run Gemma 4 E4B or E2B with mobile QAT, Metal, and multi-token prediction
+  entirely inside the iPhone, with Qwen2.5 Coder 3B/1.5B compatibility
+  options, model-specific grounded prompts, adaptive resource profiles, and an
+  in-app performance meter.
+- Boot a bundled RISC-V Linux 6.1 kernel and execute BusyBox shell commands
+  entirely on-device through a no-JIT interpreter.
 
 RelayCode is an operations console rather than a clone of an existing chat app:
 active work, blocked approvals, results, and diffs take priority over prose.
 
-## Native iOS source
+The remote file, Git, and terminal boundary is documented in
+[docs/REMOTE_STUDIO.md](docs/REMOTE_STUDIO.md). The terminal is a bounded shell
+stream, not a full PTY; full-screen TUI programs are not supported.
 
-The repository also contains an optional SwiftUI shell with device-only Keychain
-storage, same-origin `WKWebView` containment, and foreground reconnect. The PWA
-is the recommended public-alpha client because it requires no App Store or
-Xcode installation.
+The Linux guest uses 64 MB on constrained devices or 128 MB on higher-memory
+iPhones, an ephemeral in-memory filesystem, and no guest network or host-folder
+mount. Its pinned interpreter and image are downloaded and checksum-verified
+during the iOS build; see
+[`apps/ios/RelayCode/Resources/THIRD_PARTY_NOTICES.md`](apps/ios/RelayCode/Resources/THIRD_PARTY_NOTICES.md).
 
-See [apps/ios/README.md](apps/ios/README.md) to build the native shell.
+## Native iOS app
+
+The repository contains a SwiftUI app with device-only Keychain storage,
+same-origin `WKWebView` containment, direct on-premises inference, and an
+interpreted on-device Linux terminal. The PWA remains the fastest way to use
+the remote console without installing an iOS build.
+
+See [apps/ios/README.md](apps/ios/README.md) for local and GitHub-hosted build
+instructions.
 
 ## Security
 
@@ -108,6 +138,11 @@ See [apps/ios/README.md](apps/ios/README.md) to build the native shell.
   human review.
 - Workspace paths and existing thread paths are checked before reaching the
   phone.
+- Remote file traversal and symlink escape fail closed. Likely credential files
+  are hidden from the file API.
+- The direct terminal starts only through the macOS sandbox, receives no bridge
+  secrets or user shell profile, and writes only inside the selected workspace
+  and its private temporary home.
 - Unsupported app-server callbacks fail closed.
 
 Treat a paired phone like an SSH key. See [SECURITY.md](SECURITY.md) for the full
@@ -143,6 +178,10 @@ For release and iOS verification:
 npm run release:package
 npm run ios:verify
 ```
+
+Pull requests also run the complete unsigned iOS build on GitHub's macOS
+runner, so contributors do not need a local Xcode installation for compile
+verification.
 
 ## Project status
 

@@ -1,11 +1,13 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
-import { createServer } from "node:net";
+import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { createServer as createHttpServer } from "node:http";
+import { createServer as createNetServer } from "node:net";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { WebSocket } from "ws";
+import { extname, join, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
+import { WebSocket, WebSocketServer } from "ws";
 
-const targetUrl = process.env.RELAYCODE_SMOKE_URL || "http://127.0.0.1:8787/";
+let targetUrl = process.env.RELAYCODE_SMOKE_URL;
 const chromeCandidates = [
   process.env.CHROME_BIN,
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -15,7 +17,7 @@ const chromeCandidates = [
 ].filter(Boolean);
 
 async function availablePort() {
-  const server = createServer();
+  const server = createNetServer();
   await new Promise((resolve, reject) => {
     server.once("error", reject);
     server.listen(0, "127.0.0.1", resolve);
@@ -24,6 +26,183 @@ async function availablePort() {
   const port = typeof address === "object" && address ? address.port : 0;
   await new Promise((resolve) => server.close(resolve));
   return port;
+}
+
+function fixtureResult(method, params) {
+  const status = {
+    protocolVersion: 1,
+    bridgeVersion: "smoke",
+    hostName: "QA Mac",
+    agent: { id: "codex", label: "Codex", state: "ready", version: "smoke" },
+    workspaceRoots: ["/fixture"],
+    capabilities: {
+      workspaceFiles: true,
+      git: true,
+      terminal: { available: true },
+    },
+  };
+  switch (method) {
+    case "relay/status":
+      return status;
+    case "relay/workspaces":
+      return [{ path: "/fixture", name: "fixture" }];
+    case "model/list":
+      return {
+        data: [{
+          id: "gpt-smoke",
+          model: "gpt-smoke",
+          displayName: "Smoke model",
+          isDefault: true,
+          supportedReasoningEfforts: ["medium"],
+        }],
+      };
+    case "thread/list":
+      return { data: [] };
+    case "account/read":
+      return { account: { email: "qa@example.com", planType: "test" } };
+    case "account/rateLimits/read":
+      return { rateLimits: { primary: { usedPercent: 10 }, secondary: { usedPercent: 20 } } };
+    case "account/usage/read":
+      return { summary: { lifetimeTokens: 1234, currentStreakDays: 2, longestRunningTurnSec: 180 } };
+    case "workspace/entries":
+      return {
+        path: String(params?.path || ""),
+        parent: params?.path ? "" : null,
+        entries: [
+          { name: "src", path: "src", kind: "directory", size: 0, modifiedAt: 0, editable: false },
+          { name: "README.md", path: "README.md", kind: "file", size: 18, modifiedAt: 0, editable: true },
+        ],
+        truncated: false,
+      };
+    case "workspace/file/read":
+      return {
+        path: "README.md",
+        content: "# RelayCode fixture\n",
+        hash: "a".repeat(64),
+        size: 20,
+        modifiedAt: 0,
+        language: "markdown",
+      };
+    case "workspace/file/write":
+      return {
+        path: "README.md",
+        hash: "b".repeat(64),
+        size: String(params?.content || "").length,
+        modifiedAt: Date.now(),
+      };
+    case "workspace/search":
+      return {
+        results: [{ path: "README.md", line: 1, column: 3, preview: "# RelayCode fixture" }],
+      };
+    case "workspace/git/status":
+      return {
+        branch: "codex/remote-studio",
+        upstream: "origin/codex/remote-studio",
+        summary: "codex/remote-studio",
+        entries: [{ index: " ", workingTree: "M", path: "README.md" }],
+        clean: false,
+        truncated: false,
+      };
+    case "workspace/git/diff":
+      return { path: "README.md", staged: false, diff: "-old\n+new\n", truncated: false };
+    case "terminal/session/list":
+      return { capability: { available: true }, sessions: [] };
+    case "terminal/session/start":
+      return {
+        id: "terminal-smoke",
+        workspace: "/fixture",
+        network: false,
+        output: "RelayCode sandbox · fixture · network off\n",
+        sequence: 1,
+        state: "running",
+      };
+    case "terminal/session/write":
+      return { accepted: true, sequence: 2 };
+    case "terminal/session/interrupt":
+      return { interrupted: true };
+    case "terminal/session/close":
+      return { closed: true };
+    default:
+      return {};
+  }
+}
+
+async function startFixtureServer() {
+  const mobileRoot = resolve(
+    fileURLToPath(new URL("../apps/mobile/dist/", import.meta.url)),
+  );
+  const port = await availablePort();
+  const mime = {
+    ".css": "text/css; charset=utf-8",
+    ".html": "text/html; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".json": "application/json; charset=utf-8",
+    ".png": "image/png",
+    ".svg": "image/svg+xml",
+    ".webmanifest": "application/manifest+json",
+  };
+  const server = createHttpServer((request, response) => {
+    const pathname = decodeURIComponent(new URL(request.url || "/", "http://localhost").pathname);
+    const relative = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
+    const candidate = resolve(mobileRoot, relative);
+    const safe = candidate === mobileRoot || candidate.startsWith(`${mobileRoot}${sep}`);
+    const target = safe && existsSync(candidate) && statSync(candidate).isFile()
+      ? candidate
+      : resolve(mobileRoot, "index.html");
+    response.writeHead(200, {
+      "Content-Type": mime[extname(target)] || "application/octet-stream",
+      "Cache-Control": "no-store",
+    });
+    response.end(readFileSync(target));
+  });
+  const wss = new WebSocketServer({ noServer: true });
+  server.on("upgrade", (request, socket, head) => {
+    if (new URL(request.url || "/", "http://localhost").pathname !== "/ws") {
+      socket.destroy();
+      return;
+    }
+    wss.handleUpgrade(request, socket, head, (client) => wss.emit("connection", client));
+  });
+  wss.on("connection", (client) => {
+    client.send(JSON.stringify({
+      type: "hello",
+      status: fixtureResult("relay/status"),
+    }));
+    client.on("message", (data) => {
+      const message = JSON.parse(String(data));
+      if (message.type === "ping") {
+        client.send(JSON.stringify({ type: "pong", sentAt: message.sentAt, receivedAt: Date.now() }));
+        return;
+      }
+      if (message.type !== "rpc") return;
+      const result = fixtureResult(message.method, message.params);
+      client.send(JSON.stringify({ type: "rpcResult", id: message.id, result }));
+      if (message.method === "terminal/session/write") {
+        client.send(JSON.stringify({
+          type: "notification",
+          method: "terminal/output",
+          params: {
+            sessionId: "terminal-smoke",
+            sequence: 2,
+            stream: "stdout",
+            data: "REMOTE_OK\n",
+          },
+        }));
+      }
+    });
+  });
+  await new Promise((resolvePromise, reject) => {
+    server.once("error", reject);
+    server.listen(port, "127.0.0.1", resolvePromise);
+  });
+  return {
+    url: `http://127.0.0.1:${port}/#pair=smoke-token&bridge=ws%3A%2F%2F127.0.0.1%3A${port}%2Fws`,
+    close: async () => {
+      for (const client of wss.clients) client.close();
+      server.closeAllConnections();
+      await new Promise((resolvePromise) => server.close(resolvePromise));
+    },
+  };
 }
 
 async function waitForTarget(port) {
@@ -100,6 +279,8 @@ class CdpClient {
 const chromeBin = chromeCandidates.find((candidate) => existsSync(candidate));
 if (!chromeBin) throw new Error("Chrome executable not found. Set CHROME_BIN.");
 
+const fixture = targetUrl ? null : await startFixtureServer();
+targetUrl ||= fixture.url;
 const qaDir = mkdtempSync(join(tmpdir(), "relaycode-mobile-smoke-"));
 const profileDir = join(qaDir, "profile");
 const screenshotPath = join(qaDir, "mobile.png");
@@ -220,6 +401,45 @@ try {
   await cdp.call("Runtime.evaluate", {
     expression: "document.querySelector('.bottom-nav button:nth-child(3)')?.click()",
   });
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  const workspaceResult = await cdp.call("Runtime.evaluate", {
+    expression: `JSON.stringify({
+      visible: Boolean(document.querySelector(".workspace-screen")),
+      tabs: document.querySelectorAll(".workspace-tabs button").length,
+      entries: document.querySelectorAll(".file-list > button").length,
+      horizontalOverflow: document.documentElement.scrollWidth > innerWidth
+    })`,
+    returnByValue: true,
+  });
+  const workspaceState = JSON.parse(workspaceResult.result.value);
+  await cdp.call("Runtime.evaluate", {
+    expression: "document.querySelector('.workspace-tabs button:nth-child(2)')?.click()",
+  });
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  const gitResult = await cdp.call("Runtime.evaluate", {
+    expression: `JSON.stringify({
+      branch: document.querySelector(".git-summary strong")?.textContent?.trim() || null,
+      files: document.querySelectorAll(".git-file-list > button").length
+    })`,
+    returnByValue: true,
+  });
+  const gitState = JSON.parse(gitResult.result.value);
+  await cdp.call("Runtime.evaluate", {
+    expression: "document.querySelector('.workspace-tabs button:nth-child(3)')?.click()",
+  });
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  const terminalResult = await cdp.call("Runtime.evaluate", {
+    expression: `JSON.stringify({
+      startButton: Boolean(document.querySelector(".terminal-controls button")),
+      boundary: Boolean(document.querySelector(".workspace-boundary"))
+    })`,
+    returnByValue: true,
+  });
+  const terminalState = JSON.parse(terminalResult.result.value);
+
+  await cdp.call("Runtime.evaluate", {
+    expression: "document.querySelector('.bottom-nav button:nth-child(4)')?.click()",
+  });
   await new Promise((resolve) => setTimeout(resolve, 150));
   const usageResult = await cdp.call("Runtime.evaluate", {
     expression: `JSON.stringify({
@@ -233,7 +453,7 @@ try {
   const usageState = JSON.parse(usageResult.result.value);
 
   await cdp.call("Runtime.evaluate", {
-    expression: "document.querySelector('.bottom-nav button:nth-child(4)')?.click()",
+    expression: "document.querySelector('.bottom-nav button:nth-child(5)')?.click()",
   });
   await new Promise((resolve) => setTimeout(resolve, 150));
   const settingsResult = await cdp.call("Runtime.evaluate", {
@@ -248,9 +468,9 @@ try {
   const settingsState = JSON.parse(settingsResult.result.value);
 
   await cdp.call("Runtime.evaluate", {
-    expression: "document.querySelector('.bottom-nav button:nth-child(1)')?.click()",
+    expression: "document.querySelector('.bottom-nav button:nth-child(3)')?.click()",
   });
-  await new Promise((resolve) => setTimeout(resolve, 150));
+  await new Promise((resolve) => setTimeout(resolve, 250));
   const screenshot = await cdp.call("Page.captureScreenshot", {
     format: "png",
     fromSurface: true,
@@ -284,22 +504,31 @@ try {
       }
     });
 
-  console.log(JSON.stringify({
+  const report = {
     ok: !pageState.pairScreen
       && pageState.status === "연결됨"
       && !pageState.loading
       && !pageState.horizontalOverflow
+      && pageState.navItems === 5
       && launchState.visible
       && launchState.workspaceOptions > 0
       && launchState.modelOptions > 0
       && launchState.effortOptions > 0
       && launchState.launchDisabled
       && !launchState.horizontalOverflow
+      && workspaceState.visible
+      && workspaceState.tabs === 3
+      && workspaceState.entries === 2
+      && !workspaceState.horizontalOverflow
+      && gitState.branch === "codex/remote-studio"
+      && gitState.files === 1
+      && terminalState.startButton
+      && terminalState.boundary
       && usageState.accountCard
       && usageState.quotaCards === 2
       && usageState.statCards === 3
       && !usageState.horizontalOverflow
-      && settingsState.rows === 5
+      && settingsState.rows === 7
       && settingsState.securityCard
       && settingsState.disconnectButton
       && !settingsState.horizontalOverflow
@@ -307,6 +536,9 @@ try {
     page: pageState,
     views: {
       launch: launchState,
+      workspace: workspaceState,
+      git: gitState,
+      terminal: terminalState,
       usage: usageState,
       settings: settingsState,
     },
@@ -315,7 +547,9 @@ try {
     networkFailures,
     webSocketFrames,
     screenshot: screenshotPath,
-  }, null, 2));
+  };
+  console.log(JSON.stringify(report, null, 2));
+  if (!report.ok) process.exitCode = 1;
 } catch (error) {
   console.error(JSON.stringify({
     ok: false,
@@ -331,4 +565,5 @@ try {
   }
   cdp?.close();
   chrome.kill("SIGTERM");
+  await fixture?.close();
 }

@@ -1,0 +1,21 @@
+--- a/Conversation.swift
++++ b/Conversation.swift
+@@ -192 +192,3 @@
+-    _ message: Message, extraContext: [String: Any]? = nil
++    _ message: Message,
++    extraContext: [String: Any]? = nil,
++    maximumOutputTokens: Int? = nil
+@@ -202 +204,5 @@
+-          handle: handle, messageJson: messageJson, extraContext: extraContext, context: context)
++          handle: handle,
++          messageJson: messageJson,
++          extraContext: extraContext,
++          maximumOutputTokens: maximumOutputTokens,
++          context: context)
+@@ -225,0 +232 @@
++    maximumOutputTokens: Int? = nil,
+@@ -244,0 +252,4 @@
++    if let maximumOutputTokens {
++      litert_lm_conversation_optional_args_set_max_output_tokens(
++        optionalArgs, Int32(maximumOutputTokens))
++    }

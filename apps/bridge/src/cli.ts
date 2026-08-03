@@ -13,7 +13,7 @@ import {
 import { printPairing } from "./pair.js";
 import { RelayServer } from "./server.js";
 
-export const relayCodeVersion = "0.1.1";
+export const relayCodeVersion = "0.2.0";
 
 export type CliOptions = {
   command: "help" | "version" | "setup" | "serve" | "pair" | "status" | "doctor";
@@ -266,8 +266,16 @@ async function serve(): Promise<void> {
   console.log(`RelayCode bridge listening on http://${loaded.config.host}:${loaded.config.port}`);
   console.log(`Config: ${loaded.path}`);
   console.log(`Workspace roots: ${loaded.config.workspaceRoots.join(", ")}`);
-  if (loaded.newPairToken) printPairing(loaded.config, loaded.newPairToken);
-  else console.log("Run `relaycode pair` when you need to pair or rotate a phone.");
+  if (loaded.newPairToken && process.stdout.isTTY) {
+    printPairing(loaded.config, loaded.newPairToken);
+  } else if (loaded.newPairToken) {
+    // Background services redirect stdout to a log file, so the credential stays unprinted.
+    console.log(
+      "A pairing credential was generated but not printed because stdout is not a terminal. Run `relaycode pair` in a terminal to show it.",
+    );
+  } else {
+    console.log("Run `relaycode pair` when you need to pair or rotate a phone.");
+  }
 
   const shutdown = () => {
     server.close();

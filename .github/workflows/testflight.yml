@@ -1,0 +1,210 @@
+name: TestFlight
+
+on:
+  push:
+    tags:
+      - "testflight-*"
+  workflow_dispatch:
+    inputs:
+      bundle_id:
+        description: App Store Connect에 등록한 iOS Bundle ID
+        required: true
+        default: com.minseo.relaycode
+        type: string
+      marketing_version:
+        description: TestFlight에 표시할 버전
+        required: true
+        default: 0.5.1
+        type: string
+      internal_only:
+        description: 내부 테스터 전용 빌드로 제한
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testflight-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    name: Archive and upload
+    runs-on: macos-15
+    timeout-minutes: 60
+    environment: testflight
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      APP_STORE_CONNECT_PRIVATE_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
+      BUNDLE_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.bundle_id || 'com.minseo.relaycode' }}
+      MARKETING_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.marketing_version || '0.5.1' }}
+      INTERNAL_ONLY: ${{ github.event_name == 'push' || inputs.internal_only }}
+      ARCHIVE_PATH: ${{ github.workspace }}/build/RelayCode.xcarchive
+      EXPORT_PATH: ${{ github.workspace }}/build/RelayCode-export
+      EXPORT_OPTIONS_PATH: ${{ github.workspace }}/build/RelayCode-ExportOptions.plist
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Show Apple distribution toolchain
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+
+      - name: Validate deployment configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$APPLE_TEAM_ID" \
+            || -z "$APP_STORE_CONNECT_ISSUER_ID" \
+            || -z "$APP_STORE_CONNECT_KEY_ID" \
+            || -z "$APP_STORE_CONNECT_PRIVATE_KEY_BASE64" ]]; then
+            echo "::error::The testflight environment is missing one or more required Apple secrets."
+            exit 1
+          fi
+
+          if [[ ! "$APPLE_TEAM_ID" =~ ^[A-Z0-9]{10}$ ]]; then
+            echo "::error::APPLE_TEAM_ID must be a 10-character Apple Team ID."
+            exit 1
+          fi
+          if [[ ! "$APP_STORE_CONNECT_KEY_ID" =~ ^[A-Z0-9]{10}$ ]]; then
+            echo "::error::APP_STORE_CONNECT_KEY_ID must be a 10-character key ID."
+            exit 1
+          fi
+          if [[ ! "$APP_STORE_CONNECT_ISSUER_ID" =~ ^[0-9a-fA-F-]{36}$ ]]; then
+            echo "::error::APP_STORE_CONNECT_ISSUER_ID must be an issuer UUID."
+            exit 1
+          fi
+          if [[ ! "$BUNDLE_ID" =~ ^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$ ]]; then
+            echo "::error::bundle_id is not a valid reverse-DNS identifier."
+            exit 1
+          fi
+          if [[ ! "$MARKETING_VERSION" =~ ^[0-9]+(\.[0-9]+){1,2}$ ]]; then
+            echo "::error::marketing_version must look like 1.0 or 1.0.0."
+            exit 1
+          fi
+
+      - name: Prepare App Store Connect key
+        shell: bash
+        run: |
+          set -euo pipefail
+          key_path="$RUNNER_TEMP/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY_BASE64" \
+            | /usr/bin/base64 --decode > "$key_path"
+          chmod 600 "$key_path"
+          openssl pkey -in "$key_path" -noout
+          echo "ASC_KEY_PATH=$key_path" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          brew install xcodegen
+
+      - name: Verify iOS runtime and generate project
+        run: |
+          npm run ios:verify
+          npm run ios:generate
+
+      - name: Archive signed app
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "$ARCHIVE_PATH")"
+          xcodebuild \
+            -project apps/ios/RelayCode.xcodeproj \
+            -scheme RelayCode \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath "$ARCHIVE_PATH" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
+            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
+            RELAYCODE_BUNDLE_ID="$BUNDLE_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_STYLE=Automatic \
+            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
+            MARKETING_VERSION="$MARKETING_VERSION" \
+            archive
+
+      - name: Create TestFlight export options
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$INTERNAL_ONLY" == "true" ]]; then
+            internal_only_value="<true/>"
+          else
+            internal_only_value="<false/>"
+          fi
+
+          {
+            echo '<?xml version="1.0" encoding="UTF-8"?>'
+            echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">'
+            echo '<plist version="1.0">'
+            echo '<dict>'
+            echo '  <key>destination</key>'
+            echo '  <string>upload</string>'
+            echo '  <key>manageAppVersionAndBuildNumber</key>'
+            echo '  <false/>'
+            echo '  <key>method</key>'
+            echo '  <string>app-store-connect</string>'
+            echo '  <key>signingStyle</key>'
+            echo '  <string>automatic</string>'
+            echo '  <key>teamID</key>'
+            printf '  <string>%s</string>\n' "$APPLE_TEAM_ID"
+            echo '  <key>testFlightInternalTestingOnly</key>'
+            echo "  $internal_only_value"
+            echo '  <key>uploadSymbols</key>'
+            echo '  <true/>'
+            echo '</dict>'
+            echo '</plist>'
+          } > "$EXPORT_OPTIONS_PATH"
+
+          plutil -lint "$EXPORT_OPTIONS_PATH"
+
+      - name: Upload to TestFlight
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportPath "$EXPORT_PATH" \
+            -exportOptionsPlist "$EXPORT_OPTIONS_PATH" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
+            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID"
+
+      - name: Publish run summary
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          {
+            echo "## RelayCode uploaded to TestFlight"
+            echo
+            echo "- Bundle ID: \`$BUNDLE_ID\`"
+            echo "- Version: \`$MARKETING_VERSION ($GITHUB_RUN_NUMBER)\`"
+            echo "- Internal only: \`$INTERNAL_ONLY\`"
+            echo
+            echo "Apple must finish processing the build before it appears in TestFlight."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove authentication key
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          if [[ -n "${ASC_KEY_PATH:-}" && -f "$ASC_KEY_PATH" ]]; then
+            rm -f "$ASC_KEY_PATH"
+          fi

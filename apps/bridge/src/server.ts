@@ -10,17 +10,22 @@ import {
   allowedAgentMethods,
   mobileServerRequestMethods,
   parseClientMessage,
+  workspaceMethods,
   type AllowedAgentMethod,
   type BridgeStatus,
   type ServerMessage,
+  type WorkspaceMethod,
 } from "@relaycode/protocol";
 import { WebSocket, WebSocketServer } from "ws";
 import { canonicalRoots, currentTokenHash, type RelayConfig } from "./config.js";
 import { CodexAppServer } from "./codex-app-server.js";
 import { assertWorkspacePath, sanitizeAgentParams, tokenFromProtocols, tokenMatches } from "./security.js";
+import { TerminalManager, terminalCapability } from "./terminal.js";
+import { WorkspaceService } from "./workspace.js";
 
-const bridgeVersion = "0.1.1";
+const bridgeVersion = "0.2.0";
 const allowedMethods = new Set<string>(allowedAgentMethods);
+const allowedWorkspaceMethods = new Set<string>(workspaceMethods);
 const allowedServerRequests = new Set<string>(mobileServerRequestMethods);
 const threadScopedMethods = new Set<string>([
   "thread/read",
@@ -61,15 +66,25 @@ const mimeTypes: Record<string, string> = {
   ".webmanifest": "application/manifest+json",
 };
 
+const codexVersionCacheMilliseconds = 60_000;
+let codexVersionCache: { value: string | undefined; readAt: number } | null = null;
+
 function codexVersion(): string | undefined {
+  const now = Date.now();
+  if (codexVersionCache && now - codexVersionCache.readAt < codexVersionCacheMilliseconds) {
+    return codexVersionCache.value;
+  }
+  let value: string | undefined;
   try {
-    return execFileSync(process.env.CODEX_BIN || "codex", ["--version"], {
+    value = execFileSync(process.env.CODEX_BIN || "codex", ["--version"], {
       encoding: "utf8",
       timeout: 5_000,
     }).trim();
   } catch {
-    return undefined;
+    value = undefined;
   }
+  codexVersionCache = { value, readAt: now };
+  return value;
 }
 
 function webRoot(): string {
@@ -80,8 +95,15 @@ function webRoot(): string {
   return existsSync(developmentRoot) ? developmentRoot : releaseRoot;
 }
 
-function safeWebPath(root: string, requestPath: string): string | null {
-  const decoded = decodeURIComponent(requestPath.split("?")[0] || "/");
+export function safeWebPath(root: string, requestPath: string): string | null {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(requestPath.split("?")[0] || "/");
+  } catch {
+    // A malformed percent escape is a bad request, never a crash.
+    return null;
+  }
+  if (decoded.includes("\0")) return null;
   const relativePath = decoded === "/" ? "index.html" : decoded.replace(/^\/+/, "");
   const target = resolve(root, relativePath);
   return target === root || target.startsWith(`${root}${sep}`) ? target : null;
@@ -91,6 +113,8 @@ export class RelayServer {
   private readonly roots: string[];
   private readonly authorizedThreads = new Set<string>();
   private readonly codex = new CodexAppServer();
+  private readonly workspace: WorkspaceService;
+  private readonly terminals: TerminalManager;
   private readonly clients = new Set<WebSocket>();
   private readonly server = createServer((request, response) => this.handleHttp(request, response));
   private readonly wss = new WebSocketServer({
@@ -100,6 +124,8 @@ export class RelayServer {
 
   constructor(private readonly config: RelayConfig) {
     this.roots = canonicalRoots(config);
+    this.workspace = new WorkspaceService(this.roots);
+    this.terminals = new TerminalManager(this.roots);
     this.server.on("upgrade", (request, socket, head) => {
       const path = new URL(request.url || "/", "http://localhost").pathname;
       const token = tokenFromProtocols(request.headers["sec-websocket-protocol"]);
@@ -151,6 +177,20 @@ export class RelayServer {
     this.codex.on("warning", (message: string) => {
       this.broadcast({ type: "notification", method: "relay/warning", params: { message } });
     });
+    this.terminals.on("output", (params: unknown) => {
+      this.broadcast({
+        type: "notification",
+        method: "terminal/output",
+        params,
+      });
+    });
+    this.terminals.on("exit", (params: unknown) => {
+      this.broadcast({
+        type: "notification",
+        method: "terminal/exited",
+        params,
+      });
+    });
   }
 
   async listen(): Promise<void> {
@@ -165,6 +205,7 @@ export class RelayServer {
 
   close(): void {
     for (const client of this.clients) client.close(1001, "Bridge shutting down");
+    this.terminals.close();
     this.codex.stop();
     this.server.close();
   }
@@ -182,6 +223,11 @@ export class RelayServer {
         error: this.codex.lastError,
       },
       workspaceRoots: this.config.workspaceRoots,
+      capabilities: {
+        workspaceFiles: true,
+        git: true,
+        terminal: terminalCapability(),
+      },
     };
   }
 
@@ -253,6 +299,16 @@ export class RelayServer {
             path,
             name: path.split(sep).filter(Boolean).at(-1) || path,
           }));
+        } else if (allowedWorkspaceMethods.has(message.method)) {
+          const method = message.method as WorkspaceMethod;
+          if (method.startsWith("terminal/")) {
+            result = await this.terminals.request(
+              method as Extract<WorkspaceMethod, `terminal/${string}`>,
+              message.params,
+            );
+          } else {
+            result = await this.workspace.request(method, message.params);
+          }
         } else if (allowedMethods.has(message.method)) {
           const method = message.method as AllowedAgentMethod;
           const params = sanitizeAgentParams(method, message.params, this.config, this.roots);
@@ -278,6 +334,23 @@ export class RelayServer {
   }
 
   private handleHttp(request: IncomingMessage, response: ServerResponse): void {
+    try {
+      this.serveHttp(request, response);
+    } catch (error) {
+      // A single malformed request must never take the bridge down.
+      debug("http request failed", {
+        message: error instanceof Error ? error.message : String(error),
+      });
+      if (response.headersSent) {
+        response.destroy();
+        return;
+      }
+      response.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "RelayCode could not serve this request." }));
+    }
+  }
+
+  private serveHttp(request: IncomingMessage, response: ServerResponse): void {
     if (request.url === "/healthz") {
       response.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
       response.end(JSON.stringify({ ok: true, agent: this.codex.state }));
@@ -289,8 +362,13 @@ export class RelayServer {
     }
     const root = webRoot();
     const path = safeWebPath(root, request.url || "/");
+    if (path === null) {
+      response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "Invalid request path." }));
+      return;
+    }
     const fallback = resolve(root, "index.html");
-    const target = path && existsSync(path) && statSync(path).isFile() ? path : fallback;
+    const target = existsSync(path) && statSync(path).isFile() ? path : fallback;
     if (!existsSync(target)) {
       response.writeHead(503, { "Content-Type": "application/json; charset=utf-8" });
       response.end(JSON.stringify({

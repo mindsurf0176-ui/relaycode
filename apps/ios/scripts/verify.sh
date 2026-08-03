@@ -6,31 +6,75 @@ REPO_DIR="$(cd "$IOS_DIR/../.." && pwd)"
 IOS_SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
 LINK_DIR="$(mktemp -d /tmp/relaycode-ios-link.XXXXXX)"
 ASSET_DIR="$(mktemp -d /tmp/relaycode-ios-assets.XXXXXX)"
+LLAMA_FRAMEWORKS="$IOS_DIR/RelayCodeLlamaRuntime/vendor/llama.xcframework/ios-arm64"
+LITERT_FRAMEWORKS="$IOS_DIR/RelayCodeLiteRTRuntime/vendor/CLiteRTLM.xcframework/ios-arm64"
+SOURCE_DIR="$LINK_DIR/Sources"
 
 cd "$REPO_DIR"
 npm run ios:typecheck
 npm run ios:test
+"$IOS_DIR/scripts/test-linux-runtime.sh"
+mkdir -p "$SOURCE_DIR/RelayCodeCore" "$SOURCE_DIR/RelayCode"
+find "$IOS_DIR/RelayCodeCore" -maxdepth 1 -type f -name '*.swift' \
+  ! -name '* [0-9]*.swift' -exec cp {} "$SOURCE_DIR/RelayCodeCore/" \;
+find "$IOS_DIR/RelayCode" -maxdepth 1 -type f -name '*.swift' \
+  ! -name '* [0-9]*.swift' -exec cp {} "$SOURCE_DIR/RelayCode/" \;
 
 xcrun --sdk iphoneos swiftc \
   -emit-module \
   -emit-object \
+  -whole-module-optimization \
   -parse-as-library \
+  -swift-version 6 \
+  -strict-concurrency=targeted \
   -module-name RelayCodeCore \
   -target arm64-apple-ios17.0 \
   -sdk "$IOS_SDK" \
   -emit-module-path "$LINK_DIR/RelayCodeCore.swiftmodule" \
   -o "$LINK_DIR/RelayCodeCore.o" \
-  "$IOS_DIR"/RelayCodeCore/*.swift
+  "$SOURCE_DIR"/RelayCodeCore/*.swift
+
+xcrun --sdk iphoneos swiftc \
+  -emit-module \
+  -emit-object \
+  -whole-module-optimization \
+  -parse-as-library \
+  -swift-version 5 \
+  -module-name LiteRTLM \
+  -target arm64-apple-ios17.0 \
+  -sdk "$IOS_SDK" \
+  -F "$LITERT_FRAMEWORKS" \
+  -emit-module-path "$LINK_DIR/LiteRTLM.swiftmodule" \
+  -o "$LINK_DIR/LiteRTLM.o" \
+  "$IOS_DIR"/RelayCodeLiteRTRuntime/Sources/LiteRTLM/*.swift
+
+xcrun --sdk iphoneos clang \
+  -target arm64-apple-ios17.0 \
+  -isysroot "$IOS_SDK" \
+  -I "$IOS_DIR/RelayCodeLinuxRuntime/include" \
+  -I "$IOS_DIR/RelayCodeLinuxRuntime/vendor" \
+  -c "$IOS_DIR/RelayCodeLinuxRuntime/RelayCodeLinuxRuntime.c" \
+  -o "$LINK_DIR/RelayCodeLinuxRuntime.o"
 
 xcrun --sdk iphoneos swiftc \
   -emit-executable \
   -parse-as-library \
+  -swift-version 6 \
+  -strict-concurrency=targeted \
   -module-name RelayCode \
   -target arm64-apple-ios17.0 \
   -sdk "$IOS_SDK" \
   -I "$LINK_DIR" \
-  "$IOS_DIR"/RelayCode/*.swift \
+  -F "$LLAMA_FRAMEWORKS" \
+  -F "$LITERT_FRAMEWORKS" \
+  -import-objc-header "$IOS_DIR/RelayCode/RelayCode-Bridging-Header.h" \
+  -Xcc -I"$IOS_DIR/RelayCodeLinuxRuntime/include" \
+  "$SOURCE_DIR"/RelayCode/*.swift \
   "$LINK_DIR/RelayCodeCore.o" \
+  "$LINK_DIR/LiteRTLM.o" \
+  "$LINK_DIR/RelayCodeLinuxRuntime.o" \
+  -framework llama \
+  -framework CLiteRTLM \
   -o "$LINK_DIR/RelayCode"
 
 ACTOOL_REPORT="$ASSET_DIR/actool-report.plist"
@@ -59,8 +103,15 @@ fi
 
 plutil -lint \
   "$IOS_DIR/RelayCode/Info.plist" \
+  "$IOS_DIR/RelayCode/RelayCode.entitlements" \
   "$IOS_DIR/RelayCode/PrivacyInfo.xcprivacy" \
   "$ASSET_DIR/asset-info.plist"
+
+plutil -convert json -o - "$IOS_DIR/RelayCode/RelayCode.entitlements" \
+  | jq -e '
+      .["com.apple.developer.kernel.extended-virtual-addressing"] == true
+      and .["com.apple.developer.kernel.increased-memory-limit"] == true
+    ' >/dev/null
 
 file "$LINK_DIR/RelayCode"
 echo "RelayCode iOS verification passed."
